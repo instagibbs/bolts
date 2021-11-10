@@ -517,8 +517,11 @@ The final recipient must verify that the blinded route is used in the right
 context (e.g. for a specific payment). It can do so by storing `E(r)` and the
 context (e.g. a `payment_hash`), and verifying that they match when receiving
 the onion. Otherwise, to avoid additional storage cost, it can put some context
-information in the `path_id` field (e.g. a `payment_hash`) and verify that when
-receiving the onion.
+information in the `path_id` field (e.g. a `payment_hash`), hash it with a
+local secret and verify that when receiving the onion. A local secret must be
+used when relying on this, otherwise malicious senders would be able to create
+the same `path_id` and trick the recipient into accepting the route outside of
+its intended context.
 
 The `padding` field can be used to ensure that all `encrypted_data` have the
 same length. It's particularly useful when adding dummy hops at the end of a
