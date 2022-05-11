@@ -135,6 +135,41 @@ the funding transaction and both versions of the commitment transaction.
     2. data:
         * [`...*byte`:`type`]
 
+
+1. type: 32 (`open_channel_eltoo`)
+
+2. data:
+   * [`chain_hash`:`chain_hash`]
+   * [`32*byte`:`temporary_channel_id`]
+   * [`u64`:`funding_satoshis`]
+   * [`u64`:`push_msat`]
+   * [`u64`:`dust_limit_satoshis`]
+   * [`u64`:`max_htlc_value_in_flight_msat`]
+   * [`u64`:`channel_reserve_satoshis`]
+   * [`u64`:`htlc_minimum_msat`]
+   * [`u32`:`feerate_per_kw`]
+XXX   * [`u16`:`to_self_delay`]
+   * [`u16`:`shared_delay`]
+   * [`u16`:`max_accepted_htlcs`]
+   * [`point`:`funding_pubkey`]
+XXX   * [`point`:`revocation_basepoint`]
+   * [`point`:`payment_basepoint`] ### how localpubkeys are derived, "Balance output" in eltoo
+XXX   * [`point`:`delayed_payment_basepoint`] ### how local_delayedpubkeys are derived which is used for self-delay outputs and HTLC-X second stage spends.  we don't have asymmetry, just use payment?
+   * [`point`:`htlc_basepoint`]
+   * [`point`:`first_per_commitment_point`]
+   * [`byte`:`channel_flags`]
+   * [`open_channel_tlvs`:`tlvs`]
+
+1. `tlv_stream`: `open_channel_tlvs`
+2. types:
+    1. type: 0 (`upfront_shutdown_script`)
+    2. data:
+        * [`...*byte`:`shutdown_scriptpubkey`]
+    1. type: 1 (`channel_type`)
+    2. data:
+        * [`...*byte`:`type`]
+
+
 The `chain_hash` value denotes the exact blockchain that the opened channel will
 reside within. This is usually the genesis hash of the respective blockchain.
 The existence of the `chain_hash` allows nodes to open channels
@@ -213,6 +248,7 @@ The currently defined types are:
   - `option_static_remotekey` (bit 12)
   - `option_anchor_outputs` and `option_static_remotekey` (bits 20 and 12)
   - `option_anchors_zero_fee_htlc_tx` and `option_static_remotekey` (bits 22 and 12)
+  - `option_eltoo` and `option_static_remotekey` (bits XXX FIXME and 12)
 
 #### Requirements
 
@@ -379,6 +415,14 @@ signature, via `funding_signed`, it will broadcast the funding transaction.
     * [`u16`:`funding_output_index`]
     * [`signature`:`signature`]
 
+1. type: 34 (`funding_created_eltoo`)
+2. data:
+    * [`32*byte`:`temporary_channel_id`]
+    * [`sha256`:`funding_txid`]
+    * [`u16`:`funding_output_index`]
+    * [`signature`:`update_signature`]
+    * [`signature`:`settlement_signature`]
+
 #### Requirements
 
 The sender MUST set:
@@ -419,6 +463,12 @@ This message introduces the `channel_id` to identify the channel. It's derived f
 2. data:
     * [`channel_id`:`channel_id`]
     * [`signature`:`signature`]
+
+1. type: 35 (`funding_signed_eltoo`)
+2. data:
+    * [`channel_id`:`channel_id`]
+    * [`signature`:`update_signature`]
+    * [`signature`:`settlement_signature`]
 
 #### Requirements
 
@@ -617,6 +667,7 @@ non-funder has to pick a fee in this range. If the non-funder chooses the same
 value, negotiation is complete after two messages, otherwise the funder will
 reply with the same value (completing after three messages).
 
+XXX this seems fine
 1. type: 39 (`closing_signed`)
 2. data:
    * [`channel_id`:`channel_id`]
@@ -867,6 +918,24 @@ Since upgrading to enable `option_simplified_update` will require a
 quiescent period, there can be no issue with retransmission from
 before `option_simplified_update` applied.
 
+### Eltoo Operation
+
+If channel_type is eltoo, `option_simplified_update` is implied.
+
+        +-------+                               +-------+
+        |       |--(1)---- update_add_htlc ---->|       |
+        |       |--(2)---- update_add_htlc ---->|       |
+        |       |--(3)--- commitment_signed --->|       |
+        |   A   |<--(4)--- commitment_signed----|   B   |-(1)---- update_add_htlc ------->
+        |       |                               |       |
+        |       |<-(5)---- update_add_htlc -----|       |
+        |       |<-(6)--- commitment_signed ----|       |
+        |       |--(7)-- commitment_signed ---->|       |
+        |       |                               |       |
+        +-------+                               +-------+
+
+TODO XXX explain the symmetric flow
+
 ### Forwarding HTLCs
 
 In general, a node offers HTLCs for two reasons: to initiate a payment of its own,
@@ -1030,6 +1099,7 @@ specified in [BOLT #3](03-transactions.md)).
 The format of the `onion_routing_packet` portion, which indicates where the payment
 is destined, is described in [BOLT #4](04-onion-routing.md).
 
+XXX same
 1. type: 128 (`update_add_htlc`)
 2. data:
    * [`channel_id`:`channel_id`]
@@ -1141,6 +1211,7 @@ it has timed out, it has failed to route, or it is malformed.
 
 To supply the preimage:
 
+XXX same
 1. type: 130 (`update_fulfill_htlc`)
 2. data:
    * [`channel_id`:`channel_id`]
@@ -1149,6 +1220,7 @@ To supply the preimage:
 
 For a timed out or route-failed HTLC:
 
+XXX same
 1. type: 131 (`update_fail_htlc`)
 2. data:
    * [`channel_id`:`channel_id`]
@@ -1164,6 +1236,7 @@ it into a `update_fail_htlc` for relaying.
 
 For an unparsable HTLC:
 
+XXX same
 1. type: 135 (`update_fail_malformed_htlc`)
 2. data:
    * [`channel_id`:`channel_id`]
@@ -1231,6 +1304,14 @@ sign the resulting transaction (as defined in [BOLT #3](03-transactions.md)), an
    * [`signature`:`signature`]
    * [`u16`:`num_htlcs`]
    * [`num_htlcs*signature`:`htlc_signature`]
+
+1. type: 132 (`commitment_signed_eltoo`)
+2. data:
+   * [`channel_id`:`channel_id`]
+   * [`signature`:`update_signature`]
+   * [`signature`:`settlement_signature`]
+XXX   * [`u16`:`num_htlcs`]
+XXX   * [`num_htlcs*signature`:`htlc_signature`]
 
 #### Requirements
 
@@ -1302,6 +1383,8 @@ The description of key derivation is in [BOLT #3](03-transactions.md#key-derivat
    * [`channel_id`:`channel_id`]
    * [`32*byte`:`per_commitment_secret`]
    * [`point`:`next_per_commitment_point`]
+
+XXX note required for eltoo
 
 #### Requirements
 
@@ -1427,6 +1510,13 @@ messages are), they are independent of requirements here.
    * [`u64`:`next_revocation_number`]
    * [`32*byte`:`your_last_per_commitment_secret`]
    * [`point`:`my_current_per_commitment_point`]
+
+1. type: 136 (`channel_reestablish_eltoo`)
+2. data:
+   * [`channel_id`:`channel_id`]
+   * [`u64`:`next_commitment_number`]
+XXX only used for revocations  * [`32*byte`:`your_last_per_commitment_secret`]
+XXX deprecated already   * [`point`:`my_current_per_commitment_point`]
 
 `next_commitment_number`: A commitment number is a 48-bit
 incrementing counter for each commitment transaction; counters
