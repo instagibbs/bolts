@@ -155,7 +155,7 @@ XXX   * [`u16`:`to_self_delay`]
 XXX   * [`point`:`revocation_basepoint`]
    * [`point`:`payment_basepoint`] ### how localpubkeys are derived, "Balance output" in eltoo
 XXX   * [`point`:`delayed_payment_basepoint`] ### how local_delayedpubkeys are derived which is used for self-delay outputs and HTLC-X second stage spends.  we don't have asymmetry, just use payment?
-   * [`point`:`htlc_basepoint`]
+   * [`point`:`htlc_basepoint`] ### used to generate pubkeys for HTLC spends, can keep this
    * [`point`:`first_per_commitment_point`]
    * [`byte`:`channel_flags`]
    * [`open_channel_tlvs`:`tlvs`]
