@@ -136,40 +136,6 @@ the funding transaction and both versions of the commitment transaction.
         * [`...*byte`:`type`]
 
 
-1. type: 32 (`open_channel_eltoo`)
-
-2. data:
-   * [`chain_hash`:`chain_hash`]
-   * [`32*byte`:`temporary_channel_id`]
-   * [`u64`:`funding_satoshis`]
-   * [`u64`:`push_msat`]
-   * [`u64`:`dust_limit_satoshis`]
-   * [`u64`:`max_htlc_value_in_flight_msat`]
-   * [`u64`:`channel_reserve_satoshis`]
-   * [`u64`:`htlc_minimum_msat`]
-   * [`u32`:`feerate_per_kw`]
-XXX   * [`u16`:`to_self_delay`]
-   * [`u16`:`shared_delay`]
-   * [`u16`:`max_accepted_htlcs`]
-   * [`point`:`funding_pubkey`]
-XXX   * [`point`:`revocation_basepoint`]
-   * [`point`:`payment_basepoint`] ### how localpubkeys are derived, "Balance output" in eltoo
-XXX   * [`point`:`delayed_payment_basepoint`] ### how local_delayedpubkeys are derived which is used for self-delay outputs and HTLC-X second stage spends.  we don't have asymmetry, just use payment?
-   * [`point`:`htlc_basepoint`] ### used to generate pubkeys for HTLC spends, can keep this
-   * [`point`:`first_per_commitment_point`] # mixed in with basepoints to create per-commitment pubkeys
-   * [`byte`:`channel_flags`]
-   * [`open_channel_tlvs`:`tlvs`]
-
-1. `tlv_stream`: `open_channel_tlvs`
-2. types:
-    1. type: 0 (`upfront_shutdown_script`)
-    2. data:
-        * [`...*byte`:`shutdown_scriptpubkey`]
-    1. type: 1 (`channel_type`)
-    2. data:
-        * [`...*byte`:`type`]
-
-
 The `chain_hash` value denotes the exact blockchain that the opened channel will
 reside within. This is usually the genesis hash of the respective blockchain.
 The existence of the `chain_hash` allows nodes to open channels
@@ -248,7 +214,6 @@ The currently defined types are:
   - `option_static_remotekey` (bit 12)
   - `option_anchor_outputs` and `option_static_remotekey` (bits 20 and 12)
   - `option_anchors_zero_fee_htlc_tx` and `option_static_remotekey` (bits 22 and 12)
-  - `option_eltoo` and `option_static_remotekey` (bits XXX FIXME and 12)
 
 #### Requirements
 
@@ -342,11 +307,63 @@ of dust htlcs, which effectively become miner fees.
 
 Details for how to handle a channel failure can be found in [BOLT 5:Failing a Channel](05-onchain.md#failing-a-channel).
 
+### The `open_channel_eltoo` Message
+
+When `option_eltoo` is negotiated, this message contains information about
+a node and indicates its desire to set up a new channel. This is the first
+step toward creating the funding transaction and both versions of the
+commitment transaction.
+
+1. type: 32768 (`open_channel_eltoo`)
+
+2. data:
+   * [`chain_hash`:`chain_hash`]
+   * [`32*byte`:`temporary_channel_id`]
+   * [`u64`:`funding_satoshis`]
+   * [`u64`:`push_msat`]
+   * [`u64`:`dust_limit_satoshis`]
+   * [`u64`:`max_htlc_value_in_flight_msat`]
+   * [`u64`:`channel_reserve_satoshis`]
+   * [`u64`:`htlc_minimum_msat`]
+   * [`u32`:`feerate_per_kw`]
+   * [`u16`:`shared_delay`]
+   * [`u16`:`max_accepted_htlcs`]
+   * [`point`:`funding_pubkey`]
+   * [`point`:`payment_basepoint`]
+   * [`point`:`htlc_basepoint`]
+   * [`point`:`first_per_commitment_point`]
+   * [`byte`:`channel_flags`]
+   * [`open_channel_tlvs`:`tlvs`]
+
+1. `tlv_stream`: `open_channel_tlvs`
+2. types:
+    1. type: 0 (`upfront_shutdown_script`)
+    2. data:
+        * [`...*byte`:`shutdown_scriptpubkey`]
+    1. type: 1 (`channel_type`)
+    2. data:
+        * [`...*byte`:`type`]
+
+The key differences to open_channel_eltoo here are:
+  - `to_self_delay` is replaced with a symmetrical `shared_delay` which must be agreed upon by nodes
+  - there is no `revocation_basepoint` as the security of the eltoo design does not rely on penalty transactions
+  - there is no `delayed_payment_basepoint`, as there are no second-stage HTLC transactions to be pre-signed
+
+#### Defined Channel Types
+
+Eltoo commitment transactions(also known as update transactions) need no anchor outputs and have
+symmetrical state, which nullifies the requirement for the currently defined `channel_types` for
+ln-penalty-based channels.
+
+The currently defined types are:
+  - no features (no bits set)
+
 ### The `accept_channel` Message
 
 This message contains information about a node and indicates its
-acceptance of the new channel. This is the second step toward creating the
-funding transaction and both versions of the commitment transaction.
+acceptance of the new channel initiated by `open_channel`. This
+is the second step toward creating the funding transaction and both
+versions of the commitment transaction.
 
 1. type: 33 (`accept_channel`)
 2. data:
@@ -375,7 +392,7 @@ funding transaction and both versions of the commitment transaction.
     2. data:
         * [`...*byte`:`type`]
 
-1. type: 33 (`accept_channel_eltoo`)
+1. type: 32769 (`accept_channel_eltoo`)
 2. data:
    * [`32*byte`:`temporary_channel_id`]
    * [`u64`:`dust_limit_satoshis`]
@@ -444,7 +461,7 @@ signature, via `funding_signed`, it will broadcast the funding transaction.
     * [`u16`:`funding_output_index`]
     * [`signature`:`signature`]
 
-1. type: 34 (`funding_created_eltoo`)
+1. type: 32770 (`funding_created_eltoo`)
 2. data:
     * [`32*byte`:`temporary_channel_id`]
     * [`sha256`:`funding_txid`]
@@ -493,7 +510,7 @@ This message introduces the `channel_id` to identify the channel. It's derived f
     * [`channel_id`:`channel_id`]
     * [`signature`:`signature`]
 
-1. type: 35 (`funding_signed_eltoo`)
+1. type: 32771 (`funding_signed_eltoo`)
 2. data:
     * [`channel_id`:`channel_id`]
     * [`signature`:`update_signature`]
@@ -1342,7 +1359,7 @@ sign the resulting transaction (as defined in [BOLT #3](03-transactions.md)), an
 and shared state, this message is also sent right after receipt of the same message
 type when out-of-turn.
 
-1. type: 132 (`commitment_signed_eltoo`)
+1. type: 32772 (`commitment_signed_eltoo`)
 2. data:
    * [`channel_id`:`channel_id`]
    * [`signature`:`update_signature`]
@@ -1421,7 +1438,7 @@ The description of key derivation is in [BOLT #3](03-transactions.md#key-derivat
    * [`32*byte`:`per_commitment_secret`]
    * [`point`:`next_per_commitment_point`]
 
-XXX note required for eltoo
+XXX not required for eltoo
 
 #### Requirements
 
@@ -1548,7 +1565,7 @@ messages are), they are independent of requirements here.
    * [`32*byte`:`your_last_per_commitment_secret`]
    * [`point`:`my_current_per_commitment_point`]
 
-1. type: 136 (`channel_reestablish_eltoo`)
+1. type: 32773 (`channel_reestablish_eltoo`)
 2. data:
    * [`channel_id`:`channel_id`]
    * [`u64`:`next_commitment_number`]
