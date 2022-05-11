@@ -156,7 +156,7 @@ XXX   * [`point`:`revocation_basepoint`]
    * [`point`:`payment_basepoint`] ### how localpubkeys are derived, "Balance output" in eltoo
 XXX   * [`point`:`delayed_payment_basepoint`] ### how local_delayedpubkeys are derived which is used for self-delay outputs and HTLC-X second stage spends.  we don't have asymmetry, just use payment?
    * [`point`:`htlc_basepoint`] ### used to generate pubkeys for HTLC spends, can keep this
-   * [`point`:`first_per_commitment_point`]
+   * [`point`:`first_per_commitment_point`] # mixed in with basepoints to create per-commitment pubkeys
    * [`byte`:`channel_flags`]
    * [`open_channel_tlvs`:`tlvs`]
 
@@ -375,6 +375,35 @@ funding transaction and both versions of the commitment transaction.
     2. data:
         * [`...*byte`:`type`]
 
+1. type: 33 (`accept_channel_eltoo`)
+2. data:
+   * [`32*byte`:`temporary_channel_id`]
+   * [`u64`:`dust_limit_satoshis`]
+   * [`u64`:`max_htlc_value_in_flight_msat`]
+   * [`u64`:`channel_reserve_satoshis`]
+   * [`u64`:`htlc_minimum_msat`]
+   * [`u32`:`minimum_depth`]
+XXX   * [`u16`:`to_self_delay`]
+   * [`u16`:`shared_delay`]
+   * [`u16`:`max_accepted_htlcs`]
+   * [`point`:`funding_pubkey`]
+XXX   * [`point`:`revocation_basepoint`]
+   * [`point`:`payment_basepoint`]
+XXX   * [`point`:`delayed_payment_basepoint`]
+   * [`point`:`htlc_basepoint`]
+   * [`point`:`first_per_commitment_point`]
+   * [`accept_channel_tlvs`:`tlvs`]
+
+1. `tlv_stream`: `accept_channel_tlvs`
+2. types:
+    1. type: 0 (`upfront_shutdown_script`)
+    2. data:
+        * [`...*byte`:`shutdown_scriptpubkey`]
+    1. type: 1 (`channel_type`)
+    2. data:
+        * [`...*byte`:`type`]
+
+
 #### Requirements
 
 The `temporary_channel_id` MUST be the same as the `temporary_channel_id` in
@@ -518,6 +547,7 @@ is negotiated.
 
 This message indicates that the funding transaction has reached the `minimum_depth` asked for in `accept_channel`. Once both nodes have sent this, the channel enters normal operating mode.
 
+XXX same
 1. type: 36 (`funding_locked`)
 2. data:
     * [`channel_id`:`channel_id`]
@@ -922,17 +952,17 @@ before `option_simplified_update` applied.
 
 If channel_type is eltoo, `option_simplified_update` is implied.
 
-        +-------+                               +-------+
-        |       |--(1)---- update_add_htlc ---->|       |
-        |       |--(2)---- update_add_htlc ---->|       |
-        |       |--(3)--- commitment_signed --->|       |
-        |   A   |<--(4)--- commitment_signed----|   B   |-(1)---- update_add_htlc ------->
-        |       |                               |       |
-        |       |<-(5)---- update_add_htlc -----|       |
-        |       |<-(6)--- commitment_signed ----|       |
-        |       |--(7)-- commitment_signed ---->|       |
-        |       |                               |       |
-        +-------+                               +-------+
+        +-------+                                     +-------+
+        |       |--(1)---- update_add_htlc ---------->|       |
+        |       |--(2)---- update_add_htlc ---------->|       |
+        |       |--(3)--- commitment_signed_eltoo --->|       |
+        |   A   |<--(4)--- commitment_signed_eltoo----|   B   |-(1)---- update_add_htlc ------->
+        |       |                                     |       |
+        |       |<-(5)---- update_add_htlc -----------|       |
+        |       |<-(6)--- commitment_signed_eltoo ----|       |
+        |       |--(7)-- commitment_signed_eltoo ---->|       |
+        |       |                                     |       |
+        +-------+                                     +-------+
 
 TODO XXX explain the symmetric flow
 
@@ -1304,6 +1334,13 @@ sign the resulting transaction (as defined in [BOLT #3](03-transactions.md)), an
    * [`signature`:`signature`]
    * [`u16`:`num_htlcs`]
    * [`num_htlcs*signature`:`htlc_signature`]
+
+
+When a node has changes for the shared commitment, it can apply them,
+sign the resulting transaction (as defined in [BOLT #3](03-transactions.md)), and send a
+`commitment_signed` message. Due to the mandatory `option_simplified_update` operation
+and shared state, this message is also sent right after receipt of the same message
+type when out-of-turn.
 
 1. type: 132 (`commitment_signed_eltoo`)
 2. data:
