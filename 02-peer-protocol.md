@@ -310,7 +310,7 @@ Details for how to handle a channel failure can be found in [BOLT 5:Failing a Ch
 ### The `open_channel_eltoo` Message
 
 When `option_eltoo` is negotiated, this message contains information about
-a node and indicates its desire to set up a new channel. This is the first
+a node and indicates its desire to set up a new eltoo channel. This is the first
 step toward creating the funding transaction and both versions of the
 commitment transaction.
 
@@ -344,12 +344,21 @@ commitment transaction.
     2. data:
         * [`...*byte`:`type`]
 
-The key differences to open_channel_eltoo here are:
+#### Requirements
+
+FIXME Going from `to_self_delay` to `shared_delay` means both sides have to agree on a single number.
+This likely requires a new round of interaction on channel open like closing fee negotiation.
+
+#### Rationale
+
+The key differences to `open_channel` are:
   - `to_self_delay` is replaced with a symmetrical `shared_delay` which must be agreed upon by nodes
   - there is no `revocation_basepoint` as the security of the eltoo design does not rely on penalty transactions
   - there is no `delayed_payment_basepoint`, as there are no second-stage HTLC transactions to be pre-signed
 
-#### Defined Channel Types
+FIXME discussion about negotiation
+
+#### Defined Eltoo Channel Types
 
 Eltoo commitment transactions(also known as update transactions) need no anchor outputs and have
 symmetrical state, which nullifies the requirement for the currently defined `channel_types` for
@@ -420,10 +429,10 @@ The receiver:
 
 Other fields have the same requirements as their counterparts in `open_channel`.
 
-### The `accept_channel` Message
+### The `accept_channel_eltoo` Message
 
 This message contains information about a node and indicates its
-acceptance of the new channel initiated by `open_channel_eltoo`. This
+acceptance of the new eltoo channel initiated by `open_channel_eltoo`. This
 is the second step toward creating the funding transaction and both
 versions of the commitment transaction.
 
@@ -454,7 +463,11 @@ versions of the commitment transaction.
 
 #### Requirements
 
-TODO FIXME
+The same requirements as `accept_channel`, except a few redundant fields removed.
+
+#### Rationale
+
+Symmetrical state means fewer parameters are required compared to `accept_channel` channel type.
 
 ### The `funding_created` Message
 
@@ -512,16 +525,32 @@ signature, via `funding_signed`, it will broadcast the funding transaction.
     * [`signature`:`settlement_signature`]
 
 #### Requirements
-FIMXE
+
+Requirements are identical to `funding_created` except:
+
+There is no `signature` field sent, or required.
+
+The sender MUST set:
+  - `update_signature` to the valid signature using its `funding_pubkey` for the initial update transaction, as defined in [BOLT #3](03-transactions.md#update-transaction).
+  - `settlement_signature` to the valid signature using its `update_pubkey` for the initial settlement transaction, as defined in [BOLT #3](03-transactions.md#settlement-transaction).
+
+The recipient:
+  - if `update_signature` is incorrect OR non-compliant with LOW-S-standard rule<sup>[LOWS](https://github.com/bitcoin/bitcoin/pull/6769)</sup>:
+    - MUST send a `warning` and close the connection, or send an
+      `error` and fail the channel.
+  - if `settlement_signature` is incorrect OR non-compliant with LOW-S-standard rule<sup>[LOWS](https://github.com/bitcoin/bitcoin/pull/6769)</sup>:
+    - MUST send a `warning` and close the connection, or send an
+      `error` and fail the channel.
 
 #### Rationale
-FIXME
+
+Eltoo style channels require two pre-signed transactions for backing out value, rather than one.
 
 ### The `funding_signed` Message
 
 This message gives the funder the signature it needs for the first
 commitment transaction, so it can broadcast the transaction knowing that funds
-can be redeemed, if need be.
+can be redeemed, if need be. It is sent in response to `funding_created`.
 
 This message introduces the `channel_id` to identify the channel. It's derived from the funding transaction by combining the `funding_txid` and the `funding_output_index`, using big-endian exclusive-OR (i.e. `funding_output_index` alters the last 2 bytes).
 
@@ -578,7 +607,7 @@ is negotiated.
 
 This message gives the funder the signature it needs for the first
 commitment transaction, so it can broadcast the transaction knowing that funds
-can be redeemed, if need be.
+can be redeemed, if need be. It is sent in response to `funding_created_eltoo`.
 
 This message introduces the `channel_id` to identify the channel. It's derived from the funding transaction by combining the `funding_txid` and the `funding_output_index`, using big-endian exclusive-OR (i.e. `funding_output_index` alters the last 2 bytes).
 
@@ -589,13 +618,35 @@ This message introduces the `channel_id` to identify the channel. It's derived f
     * [`signature`:`update_signature`]
     * [`signature`:`settlement_signature`]
 
-#### Requirement
+#### Requirements
 
-FIXME
+Both peers:
+  - if `channel_type` was present in both `open_channel` and `accept_channel` and is not empty(no bits set):
+    - MUST send a `warning` and close the connection, or send an
+      `error` and fail the channel.
+  - otherwise:
+    - the `channel_type` is empty
+  - MUST use that `channel_type` for all transactions.
+
+The sender MUST set:
+  - `channel_id` by exclusive-OR of the `funding_txid` and the `funding_output_index` from the `funding_created_eltoo` message.
+  - `update_signature` to the valid signature, using its `update_pubkey` for the initial update transaction, as defined in [BOLT #3](03-transactions.md#update-transaction).
+  - `settlement_signature` to the valid signature, using its `settlement_pubkey` for the initial settlement transaction, as defined in [BOLT #3](03-transactions.md#settlement-transaction).
+
+The recipient:
+  - if `update_signature` is incorrect OR non-compliant with LOW-S-standard rule<sup>[LOWS](https://github.com/bitcoin/bitcoin/pull/6769)</sup>:
+    - MUST send a `warning` and close the connection, or send an
+      `error` and fail the channel.
+  - if `settlement_signature` is incorrect OR non-compliant with LOW-S-standard rule<sup>[LOWS](https://github.com/bitcoin/bitcoin/pull/6769)</sup>:
+    - MUST send a `warning` and close the connection, or send an
+      `error` and fail the channel.
+  - MUST NOT broadcast the funding transaction before receipt of a valid `funding_signed_eltoo`.
+  - on receipt of a valid `funding_signed_eltoo`:
+    - SHOULD broadcast the funding transaction.
 
 #### Rationale
 
-FIXME
+Eltoo style channels require two pre-signed transactions for backing out value, rather than one.
 
 ### The `funding_locked` Message
 
@@ -1002,7 +1053,8 @@ before `option_simplified_update` applied.
 
 ### Eltoo Simplified Operation
 
-If `open_channel_eltoo` was used to initiate the channel, `option_simplified_update` is implied.
+If `open_channel_eltoo` was used to initiate the channel, `option_simplified_update` rules are implied,
+with modifications.
 
         +-------+                                     +-------+
         |       |--(1)---- update_add_htlc ---------->|       |
@@ -1026,11 +1078,41 @@ as the commitment transaction can be signed locally and broadcasted at any point
 
 #### Requirements
 
-FIXME
+Same requirements as `option_simplified_update` except:
+
+A node:
+  - At any time:
+    - if it receives a `commitment_signed` or `revoke_and_ack` message
+      - SHOULD send an `error` to the sending peer (if connected).
+      - MUST fail the channel.
+  - During this node's turn:
+    - if it receives an update message or `commitment_signed_eltoo`:
+      - if it has sent its own update or `commitment_signed_eltoo`:
+        - MUST ignore the message
+      - otherwise:
+        - MUST reply with `yield` and process the message.
+  - During the other node's turn:
+    - if it has not received an update message or `commitment_signed_eltoo`:
+      - MAY send one or more update message or `commitment_signed_eltoo`:
+        - MUST NOT include those changes if it receives a later update message or `commitment_signed_eltoo`.
+        - MUST include those changes if it receives a `yield` in reply.
+
+Upon reconnection when `channel_reestablish_eltoo` is exchanged:
+  - If it has sent `commitment_signed_eltoo` on the other peer's turn without receiving `yield`:
+    - MUST NOT consider that `commitment_signed_eltoo` sent when setting `channel_reestablish` fields.
+  - If a node's sent `next_commitment_number` is less than its received
+    `next_commitment_number`, that node's turn is unfinished.
+    - due to symmetrical state of eltoo and simplified operation only,
+      there can only be one unfinished side
+  - otherwise the turn starts with the peer with the lesser
+    SEC1-encoded node_id.
 
 #### Rationale
 
-FIXME
+Commitment numbers will stay synchronized after the successful end of each turn. On reconnection this allows
+a trivial comparison to determine if there was an unfinished turn. Note that this means upgrading of penalty
+channels to eltoo channels is made more difficult if done in the future as we can not assume the commitment
+numbers are synchronized.
 
 ### Forwarding HTLCs
 
@@ -1197,7 +1279,6 @@ specified in [BOLT #3](03-transactions.md)).
 The format of the `onion_routing_packet` portion, which indicates where the payment
 is destined, is described in [BOLT #4](04-onion-routing.md).
 
-XXX same
 1. type: 128 (`update_add_htlc`)
 2. data:
    * [`channel_id`:`channel_id`]
@@ -1403,9 +1484,7 @@ sign the resulting transaction (as defined in [BOLT #3](03-transactions.md)), an
 
 When a node has changes for the shared commitment, it can apply them,
 sign the resulting transaction (as defined in [BOLT #3](03-transactions.md)), and send a
-`commitment_signed` message. Due to the mandatory `option_simplified_update` operation
-and shared state, this message is also sent right after receipt of the same message
-type when out-of-turn.
+`commitment_signed` message.
 
 #### Requirements
 
