@@ -1097,15 +1097,7 @@ A node:
         - MUST NOT include those changes if it receives a later update message or `commitment_signed_eltoo`.
         - MUST include those changes if it receives a `yield` in reply.
 
-Upon reconnection when `channel_reestablish_eltoo` is exchanged:
-  - If it has sent `commitment_signed_eltoo` on the other peer's turn without receiving `yield`:
-    - MUST NOT consider that `commitment_signed_eltoo` sent when setting `channel_reestablish` fields.
-  - If a node's sent `next_commitment_number` is less than its received
-    `next_commitment_number`, that node's turn is unfinished.
-    - due to symmetrical state of eltoo and simplified operation only,
-      there can only be one unfinished side
-  - otherwise the turn starts with the peer with the lesser
-    SEC1-encoded node_id.
+and channel reestablishment, defined by `channel_reestablish_eltoo`
 
 #### Rationale
 
@@ -1545,7 +1537,7 @@ sign the resulting transaction (as defined in [BOLT #3](03-transactions.md)), an
 
 Once the recipient of `commitment_signed_eltoo` checks the signatures and knows
 it has a valid new commitment transaction, it replies with its own `commitment_signed_eltoo`
-message to finalize the update.
+message over the same transactions to finalize the update.
 
 1. type: 32772 (`commitment_signed_eltoo`)
 2. data:
@@ -1555,11 +1547,32 @@ message to finalize the update.
 
 #### Requirements
 
-FIXME
+A sending node:
+  - during their turn(or when attempting to cause the counter-party to yield):
+    - MUST NOT send a `commitment_signed_eltoo` message that
+      does not include any updates.
+    - MAY send a `commitment_signed_eltoo` message that only
+      alters the fee.
+  - otherwise:
+    - MUST NOT include any changes
+
+A receiving node:
+  - during another's turn:
+    - once all pending updates are applied:
+      - if `update_signature` is not valid for its local commitment transaction OR non-compliant with LOW-S-standard rule <sup>[LOWS](https://github.com/bitcoin/bitcoin/pull/6769)</sup>:
+        - MUST send a `warning` and close the connection, or send an
+          `error` and fail the channel.
+      - if `settlement_signature` is not valid for its local commitment transaction OR non-compliant with LOW-S-standard rule <sup>[LOWS](https://github.com/bitcoin/bitcoin/pull/6769)</sup>:
+        - MUST send a `warning` and close the connection, or send an
+          `error` and fail the channel.
+    - MUST respond with a `commitment_signed_eltoo` message if their own.
+  - during their turn
+    - MUST consider the previous transactions revoked
 
 #### Rationale
 
-FIXME
+HTLCs do not require signatures by the offerer, which is why only the two signatures
+for update and settlement transactions are required at this stage.
 
 ### Completing the Transition to the Updated State: `revoke_and_ack`
 
@@ -1920,17 +1933,31 @@ fall back to the `option_data_loss_protect` behavior if
    * [`channel_id`:`channel_id`]
    * [`u64`:`next_commitment_number`]
 
-Due to symmetry and lack of penalty transactions, we only need to
-communicate to the remote node which state we are on, which should match
-the number they send as well.
-
 #### Requirements
 
-FIXME
+Reestablishment of eltoo channels is handled similarly
+to the penalty-based simplified update scheme, with
+the extraneous fields removed, and using the `_eltoo`
+based messages respectively.
+
+Upon reconnection when `channel_reestablish_eltoo` is exchanged:
+  - If it has sent `commitment_signed_eltoo` on the other peer's turn without receiving `yield`:
+    - MUST NOT consider that `commitment_signed_eltoo` sent when setting `channel_reestablish` fields.
+  - If a node's sent `next_commitment_number` is one less than its received
+    `next_commitment_number`, that node's turn is unfinished.
+    - due to symmetrical state of eltoo and simplified operation only,
+      there can only be one unfinished side
+  - else if both sent and received `next_commitment_number`s are identical:
+    - the turn starts with the peer with the lesser
+      SEC1-encoded node_id.
+  - otherwise:
+    - ??? FIXME We can just send them the latest state if we're being nice
 
 #### Rationale
 
-FIXME
+Due to symmetry and lack of penalty transactions, we only need to
+communicate to the remote node which state we are on, which should match
+the number they send as well.
 
 # Authors
 
