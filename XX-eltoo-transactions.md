@@ -6,7 +6,7 @@ This details the exact format of on-chain transactions, which both sides need to
 
   * [Transactions](#transactions)
     * [Transaction Output Ordering](#transaction-output-ordering)
-    * [Use of Segwit](#use-of-segwit)
+    * [Use of Taproot](#use-of-segwit)
     * [Funding Transaction Output](#funding-transaction-output)
     * [Update Transaction](#update-transaction)
     * [Settlement Transaction](#settlement-transaction)
@@ -45,7 +45,7 @@ enforced here.
 
 ## Use of Taproot
 
-Most transaction outputs used here are pay-to-taproot<sup>[BIP341](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#constructing-and-spending-taproot-outputs)</sup> (P2TR) outputs. To spend such outputs FIXME note what we're omitting from witness
+Most transaction outputs used here are pay-to-taproot<sup>[BIP341](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#constructing-and-spending-taproot-outputs)</sup> (P2TR) outputs. We are ommitting all non-script related witness stack items for brevity such as control block, inner pubkeys, et al.
 
 A `<>` designates an empty vector as required for compliance with MINIMALIF-standard rule.<sup>[MINIMALIF](https://lists.linuxfoundation.org/pipermail/bitcoin-dev/2016-August/013014.html)</sup>
 
