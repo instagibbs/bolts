@@ -325,13 +325,11 @@ commitment transaction.
    * [`u64`:`max_htlc_value_in_flight_msat`]
    * [`u64`:`channel_reserve_satoshis`]
    * [`u64`:`htlc_minimum_msat`]
-   * [`u32`:`feerate_per_kw`]
    * [`u16`:`shared_delay`]
    * [`u16`:`max_accepted_htlcs`]
    * [`point`:`funding_pubkey`]
-   * [`point`:`payment_basepoint`]
-   * [`point`:`htlc_basepoint`]
-   * [`point`:`first_per_commitment_point`]
+   * [`point`:`settlement_pubkey`]
+   * [`point`:`htlc_pubkey`]
    * [`byte`:`channel_flags`]
    * [`open_channel_tlvs`:`tlvs`]
 
@@ -348,15 +346,25 @@ commitment transaction.
 
 FIXME Going from `to_self_delay` to `shared_delay` means both sides have to agree on a single number.
 This likely requires a new round of interaction on channel open like closing fee negotiation.
+Also probably required for `dust_limit_satoshis`
+
+FIXME do we want all HLTCs to have unique pubkeys now that state is symmetrical? Previously it was obvious
+to group HTLCs due to asymmetry
+
+Changed fields from `open_channel`:
+  - `to_self_delay` is replaced with a symmetrical `shared_delay` which must be agreed upon by nodes
+  - `dust_limit_satoshis` must be agree upon by all parties
+  - there is no `revocation_basepoint` as the security of the eltoo design does not rely on penalty transactions
+  - there is no `delayed_payment_basepoint`, as there are no second-stage HTLC transactions to be pre-signed
+  - `payment_basepoint` is replaced with a static `settlement_pubkey`
+  - no `feerate_per_kw` as there is no up-front negotiated fee for update or settlement transactions
+  - `htlc_basepoint` is replaced by `htlc_pubkey`
+  - `first_per_commitment_point` is removed
 
 #### Rationale
 
-The key differences to `open_channel` are:
-  - `to_self_delay` is replaced with a symmetrical `shared_delay` which must be agreed upon by nodes
-  - there is no `revocation_basepoint` as the security of the eltoo design does not rely on penalty transactions
-  - there is no `delayed_payment_basepoint`, as there are no second-stage HTLC transactions to be pre-signed
-
-FIXME discussion about negotiation
+The symmetrical transaction state among all peers means that we can simplify some aspects while
+requiring additional range negotiation in others.
 
 #### Defined Eltoo Channel Types
 
@@ -447,9 +455,8 @@ versions of the commitment transaction.
    * [`u16`:`shared_delay`]
    * [`u16`:`max_accepted_htlcs`]
    * [`point`:`funding_pubkey`]
-   * [`point`:`payment_basepoint`]
-   * [`point`:`htlc_basepoint`]
-   * [`point`:`first_per_commitment_point`]
+   * [`point`:`settlement_pubkey`]
+   * [`point`:`htlc_pubkey`]
    * [`accept_channel_tlvs`:`tlvs`]
 
 1. `tlv_stream`: `accept_channel_tlvs`
