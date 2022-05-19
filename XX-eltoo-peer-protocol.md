@@ -1,30 +1,28 @@
-# BOLT #2: Peer Protocol for Channel Management
+# BOLT #2: Peer Protocol for Eltoo Channel Management
 
-The peer channel protocol has three phases: establishment, normal
+The peer eltoo channel protocol has three phases: establishment, normal
 operation, and closing.
 
-FIXME split into its own BOLT?
 # Table of Contents
 
   * [Channel](#channel)
     * [Definition of `channel_id`](#definition-of-channel_id)
     * [Channel Establishment](#channel-establishment)
-      * [The `open_channel` Message](#the-open_channel-message)
-      * [The `accept_channel` Message](#the-accept_channel-message)
-      * [The `funding_created` Message](#the-funding_created-message)
-      * [The `funding_signed` Message](#the-funding_signed-message)
-      * [The `funding_locked` Message](#the-funding_locked-message)
+      * [The `open_channel_eltoo` Message](#the-open_channel_eltoo-message)
+      * [The `accept_channel_eltoo` Message](#the-accept_channel_eltoo-message)
+      * [The `funding_created_eltoo` Message](#the-funding_created_eltoo-message)
+      * [The `funding_signed_eltoo` Message](#the-funding_signed_eltoo-message)
+      * [The `funding_locked_eltoo` Message](#the-funding_locked_eltoo-message)
     * [Channel Close](#channel-close)
-      * [Closing Initiation: `shutdown`](#closing-initiation-shutdown)
-      * [Closing Negotiation: `closing_signed`](#closing-negotiation-closing_signed)
-    * [Normal Operation](#normal-operation)
-      * [Simplified Operation](#simplified-operation)
+      * [Closing Initiation: `shutdown_eltoo`](#closing-initiation-shutdown)
+      * [Closing Negotiation: `closing_signed_eltoo`](#closing-negotiation-closing_signed)
+    * [Eltoo Normal Operation](#eltoo-operation)
       * [Forwarding HTLCs](#forwarding-htlcs)
       * [`cltv_expiry_delta` Selection](#cltv_expiry_delta-selection)
       * [Adding an HTLC: `update_add_htlc`](#adding-an-htlc-update_add_htlc)
       * [Removing an HTLC: `update_fulfill_htlc`, `update_fail_htlc`, and `update_fail_malformed_htlc`](#removing-an-htlc-update_fulfill_htlc-update_fail_htlc-and-update_fail_malformed_htlc)
       * [Committing Updates So Far: `commitment_signed`](#committing-updates-so-far-commitment_signed)
-      * [Completing the Transition to the Updated State: `revoke_and_ack`](#completing-the-transition-to-the-updated-state-revoke_and_ack)
+      * [Completing the Transition to the Updated State: `commitment_signed_ack`](#completing-the-transition-to-the-updated-state-commitment_signed_ack)
       * [Updating Fees: `update_fee`](#updating-fees-update_fee)
     * [Message Retransmission: `channel_reestablish` message](#message-retransmission)
   * [Authors](#authors)
