@@ -2,7 +2,7 @@
 
 ## Abstract
 
-Lightning allows for two parties (a local node and a remote node) to conduct transactions
+Lightning eltoo channels allow for two parties (a local node and a remote node) to conduct transactions
 off-chain by giving each of the parties a *signed update and settlement transaction*,
 which describes the current state of the channel (basically, the current balance).
 This *update transaction* and *settlement transactions* are updated every time a new payment is made and
@@ -13,35 +13,31 @@ There are three ways a channel can end:
 1. The good way (*mutual close*): at some point the local and remote nodes agree
 to close the channel. They generate a *closing transaction* (which is similar to a
 settlement transaction, but without any pending payments) and publish it on the
-blockchain (see [BOLT #2: Channel Close](02-peer-protocol.md#channel-close)).
+blockchain (see [BOLT #??: Channel Close](XX-eltoo-peer-protocol.md#channel-close)).
 2. The bad way (*unilateral close*): something goes wrong, possibly without evil
 intent on either side. Perhaps one party crashed, for instance. One side
-publishes its *latest commitment transaction*.
-3. The ugly way (*revoked transaction close*): one of the parties deliberately
-tries to cheat, by publishing an *outdated commitment transaction* (presumably,
-a prior version, which is more in its favor).
+publishes latest *latest update transaction*.
+3. The ugly way (*stale unilateral close*): something goes very wrong, peer
+publishes an update transaction that has been replaced with a subsequent transaction
+version.
 
-Because Lightning is designed to be trustless, there is no risk of loss of funds
-in any of these three cases; provided that the situation is properly handled.
 The goal of this document is to explain exactly how a node should react when it
 encounters any of the above situations, on-chain.
 
 # Table of Contents
   * [General Nomenclature](#general-nomenclature)
-  * [Commitment Transaction](#commitment-transaction)
+  * [Update Transaction](#update-transaction)
+  * [Settlement Transaction](#settlement-transaction)
   * [Failing a Channel](#failing-a-channel)
   * [Mutual Close Handling](#mutual-close-handling)
-  * [Unilateral Close Handling: Local Commitment Transaction](#unilateral-close-handling-local-commitment-transaction)
-      * [HTLC Output Handling: Local Commitment, Local Offers](#htlc-output-handling-local-commitment-local-offers)
-      * [HTLC Output Handling: Local Commitment, Remote Offers](#htlc-output-handling-local-commitment-remote-offers)
-  * [Unilateral Close Handling: Remote Commitment Transaction](#unilateral-close-handling-remote-commitment-transaction)
-      * [HTLC Output Handling: Remote Commitment, Local Offers](#htlc-output-handling-remote-commitment-local-offers)
-      * [HTLC Output Handling: Remote Commitment, Remote Offers](#htlc-output-handling-remote-commitment-remote-offers)
-  * [Revoked Transaction Close Handling](#revoked-transaction-close-handling)
-	  * [Penalty Transactions Weight Calculation](#penalty-transactions-weight-calculation)
-  * [Generation of HTLC Transactions](#generation-of-htlc-transactions)
+  * [Unilateral Close Handling: Latest Update Transaction](#unilateral-close-handling-latest-update-transaction)
+???      * [HTLC Output Handling: Local Commitment, Local Offers](#htlc-output-handling-local-commitment-local-offers)
+???      * [HTLC Output Handling: Local Commitment, Remote Offers](#htlc-output-handling-local-commitment-remote-offers)
+  * [Stale Transaction Close Handling](#stale-transaction-close-handling)
+???	  * [Penalty Transactions Weight Calculation](#penalty-transactions-weight-calculation)
+???  * [Generation of HTLC Spends](#generation-of-htlc-spends)
   * [General Requirements](#general-requirements)
-  * [Appendix A: Expected Weights](#appendix-a-expected-weights)
+???  * [Appendix A: Expected Weights](#appendix-a-expected-weights)
 	* [Expected Weight of the `to_local` Penalty Transaction Witness](#expected-weight-of-the-to-local-penalty-transaction-witness)
 	* [Expected Weight of the `offered_htlc` Penalty Transaction Witness](#expected-weight-of-the-offered-htlc-penalty-transaction-witness)
 	* [Expected Weight of the `accepted_htlc` Penalty Transaction Witness](#expected-weight-of-the-accepted-htlc-penalty-transaction-witness)
@@ -51,12 +47,10 @@ encounters any of the above situations, on-chain.
 
 Any unspent output is considered to be *unresolved* and can be *resolved*
 as detailed in this document. Usually this is accomplished by spending it with
-another *resolving* transaction. Although, sometimes simply noting the output
-for later wallet spending is sufficient, in which case the transaction containing
-the output is considered to be its own *resolving* transaction.
+another *resolving* transaction. 
 
 Outputs that are *resolved* are considered *irrevocably resolved*
-once the remote's *resolving* transaction is included in a block at least 100
+once the *resolving* transaction is included in a block at least 100
 deep, on the most-work blockchain. 100 blocks is far greater than the
 longest known Bitcoin fork and is the same wait time used for
 confirmations of miners' rewards (see [Reference Implementation](https://github.com/bitcoin/bitcoin/blob/4db82b7aab4ad64717f742a7318e3dc6811b41be/src/consensus/tx_verify.cpp#L223)).
@@ -64,8 +58,8 @@ confirmations of miners' rewards (see [Reference Implementation](https://github.
 ## Requirements
 
 A node:
-  - once it has broadcast a funding transaction OR sent a commitment signature
-  for a commitment transaction that contains an HTLC output:
+  - once it has broadcast a funding transaction OR sent a signature
+  for a update/settlement transaction pair that contains an HTLC output:
     - until all outputs are *irrevocably resolved*:
       - MUST monitor the blockchain for transactions that spend any output that
       is NOT *irrevocably resolved*.
@@ -81,46 +75,47 @@ A node:
 ## Rationale
 
 Once a local node has some funds at stake, monitoring the blockchain is required
-to ensure the remote node does not close unilaterally.
+to ensure the remote node does not close unilaterally to a stale state.
 
 Invalid transactions (e.g. bad signatures) can be generated by anyone,
 (and will be ignored by the blockchain anyway), so they should not
 trigger any action.
 
-# Commitment Transaction
+# Update Transaction
 
-The local and remote nodes each hold a *commitment transaction*. Each of these
-commitment transactions has up to six types of outputs:
+The local and remote nodes each hold a *update transaction*. 
 
-1. _local node's main output_: Zero or one output, to pay to the *local node's*
-delayed_pubkey.
-2. _remote node's main output_: Zero or one output, to pay to the *remote node's*
-delayed_pubkey.
-3. _local node's anchor output_: one output paying to the *local node's*
-funding_pubkey.
-4. _remote node's anchor output_: one output paying to the *remote node's*
-funding_pubkey.
-5. _local node's offered HTLCs_: Zero or more pending payments (*HTLCs*), to pay
-the *remote node* in return for a payment preimage.
-6. _remote node's offered HTLCs_: Zero or more pending payments (*HTLCs*), to
-pay the *local node* in return for a payment preimage.
+These transactions contain a single input and output signed with
+SIGHASH_SINGLE, which allows fee inputs and outputs to be added
+by the broadcasting node.
 
-To incentivize the local and remote nodes to cooperate, an `OP_CHECKSEQUENCEVERIFY`
-relative timeout encumbers the *local node's outputs* (in the *local node's
-commitment transaction*) and the *remote node's outputs* (in the *remote node's
-commitment transaction*). So for example, if the local node publishes its
-commitment transaction, it will have to wait to claim its own funds,
-whereas the remote node will have immediate access to its own funds. As a
-consequence, the two commitment transactions are not identical, but they are
-(usually) symmetrical.
+Each subsequent version of this transaction can be "re-bound" to spend
+any prior input that is unresolved on the blockchain.
 
-See [BOLT #3: Commitment Transaction](03-transactions.md#commitment-transaction)
+See [BOLT #??: Update Transaction](??-eltoo-transactions.md#update-transaction)
+for more details.
+
+# Settlement Transaction
+
+The local and remote nodes each hold a *settlement transaction*. Each of these
+settlement transactions has up to two types of outputs:
+
+1. A node's main output_: Zero or one output, to pay a peer's
+`settlment_pubkey`.
+1. A node's offered HTLCs_: Zero or more pending payments (*HTLCs*), to pay
+a peer in return for a payment preimage.
+
+As we rely on the publication of update transactions to enforce the final
+state, these outputs have no timelock, aside from the timeout path for the
+HTLC outputs.
+
+See [BOLT #??: Settlement Transaction](??-eltoo-transactions.md#settlement-transaction)
 for more details.
 
 # Failing a Channel
 
 Although closing a channel can be accomplished in several ways, the most
-efficient is preferred.
+efficient is preferred for privacy and fees.
 
 Various error cases involve closing a channel. The requirements for sending
 error messages to peers are specified in
@@ -129,35 +124,35 @@ error messages to peers are specified in
 ## Requirements
 
 A node:
-  - if a *local commitment transaction* has NOT ever contained a `to_local`
+  - if a *settlement transaction* has NOT ever contained a `to_node` output to itself
   or HTLC output:
     - MAY simply forget the channel.
   - otherwise:
-    - if the *current commitment transaction* does NOT contain `to_local` or
+    - if the *current settlement transaction* does NOT contain a `to_node` output to itself or
     other HTLC outputs:
       - MAY simply wait for the remote node to close the channel.
       - until the remote node closes:
         - MUST NOT forget the channel.
     - otherwise:
-      - if it has received a valid `closing_signed` message that includes a
+      - if it has received a valid `closing_signed_eltoo` message that includes a
       sufficient fee:
         - SHOULD use this fee to perform a *mutual close*.
       - otherwise:
       	- if the node knows or assumes its channel state is outdated:
-      	  - MUST NOT broadcast its *last commitment transaction*.
+      	  - SHOULD NOT broadcast its *last update transaction*. (FIXME might be fine?)
         - otherwise:
-          - MUST broadcast the *last commitment transaction*, for which it has a
-          signature, to perform a *unilateral close*.
-          - MUST spend any `to_local_anchor` output, providing sufficient fees as incentive to include the commitment transaction in a block.
-          Special care must be taken when spending to a third-party, because this re-introduces the vulnerability that was
-          addressed by adding the CSV delay to the non-anchor outputs.
-          - SHOULD use [replace-by-fee](https://github.com/bitcoin/bips/blob/master/bip-0125.mediawiki) or other mechanism on the spending transaction if it proves insufficient for timely inclusion in a block.
+          - MUST broadcast the *last update transaction*, for which it has a
+          signature as well as the signature and data for the settlement transaction, to perform a *unilateral close*.
+            - MUST attach additional inputs in order to induce inclusion in a block in a timely manner to enforce final state
+            - MAY attach additional outputs to use for CPFP
+            - SHOULD use [replace-by-fee](https://github.com/bitcoin/bips/blob/master/bip-0125.mediawiki) or other mechanism on the spending transaction if it proves insufficient for timely inclusion in a block.
+          - After `shared_delay` timeout, if the update transaction output isn't otherwise resolved, MUST broadcast the associated *settlement transaction*.
+            - MAY attach additional inputs in order to induce inclusion in a block in a timely manner to enforce final state
+              - FIXME This requires ANYPREVOUT to ommit the value in its commitment like ANYPREVOUTANYSCRIPT.
+            - MAY spend settlement transaction outputs it controls to use for CPFP
+              - FIXME Requires package relay
 
 ## Rationale
-
-Since `dust_limit_satoshis` is supposed to prevent creation of uneconomic
-outputs (which would otherwise remain forever, unspent on the blockchain), all
-commitment transaction outputs MUST be spent.
 
 In the early stages of a channel, it's common for one side to have
 little or no funds in the channel; in this case, having nothing at stake, a node
@@ -165,11 +160,10 @@ need not consume resources monitoring the channel state.
 
 There exists a bias towards preferring mutual closes over unilateral closes,
 because outputs of the former are unencumbered by a delay and are directly
-spendable by wallets. In addition, mutual close fees tend to be less exaggerated
-than those of commitment transactions (or in the case of `option_anchors`,
-the commitment transaction may require a child transaction to cause it to be mined). So, the only reason not to use the
-signature from `closing_signed` would be if the fee offered was too small for
-it to be processed.
+spendable by wallets. In addition, mutual close fees tend to be significantly smaller
+than those required of the update and settlement transactions.
+So, the only reason not to use the signature from `closing_signed_eltoo` would be if the fee
+offered was too small for it to be processed.
 
 # Mutual Close Handling
 
@@ -177,24 +171,56 @@ A closing transaction *resolves* the funding transaction output.
 
 In the case of a mutual close, a node need not do anything else, as it has
 already agreed to the output, which is sent to its specified `scriptpubkey` (see
-[BOLT #2: Closing initiation: `shutdown`](02-peer-protocol.md#closing-initiation-shutdown)).
+[BOLT #??: Closing initiation: `shutdown_eltoo`](XX-eltoo-peer-protocol.md#closing-initiation-shutdown)).
 
-# Unilateral Close Handling: Local Commitment Transaction
+# Unilateral Close Handling: Stale Update and Settlement Transactions
 
-This is the first of two cases involving unilateral closes. In this case, a
-node discovers its *local commitment transaction*, which *resolves* the funding
-transaction output.
+In eltoo-based channels, there are up to `k` update transactions available
+to be put into the blockchain. If the node sees the funding output
+being resolved without a mutual close, action may need to be taken to ensure
+the final state is claimed.
 
-However, a node cannot claim funds from the outputs of a unilateral close that
-it initiated, until the `OP_CHECKSEQUENCEVERIFY` delay has passed (as specified
-by the remote node's `to_self_delay` field). Where relevant, this situation is
-noted below.
+The associated settlement transaction can not be used until the `shared_delay`
+relative timelock times out for the newly created state output. This delay
+is what allows honest peers to ensure the final state is claimed.
+
+## Requirements
+
+FIXME: Define rebinding precisely
+
+A node:
+  - upon discovering a *stale update transaction*:
+    - if the node does not have its own untrimmed `to_node` output or untrimmed inbound
+      HLTC output, no action is required
+    - MUST respond by publishing the latest update transaction, re-bound
+      to the stale update transactions' first output
+    FIXME need to define exactly how many blocks we should be waiting before freaking out
+    - if the latest update transaction is then confirmed within X blocks:
+      - MUST wait `shared_delay` blocks of confirmation for this transaction
+        to publish the pre-signed *settlement transaction*
+    - otherwise:
+      - FIXME MUST do something because we're at risk of the latest confirmed
+        update transaction outputs being spent by a stale settlement transaction
+
+## Rationale 
+
+# Unilateral Close Handling: Latest Update and Settlement Transaction
+
+In the other eltoo channel case, we see the latest channel state
+be confirmed on the blockchain, and must ensure that the settlement transaction
+outputs are created and then spent in a safe amount of time, for the case of
+HTLC outputs.
 
 ## Requirements
 
 A node:
-  - upon discovering its *local commitment transaction*:
-    - SHOULD spend the `to_local` output to a convenient address.
+  - upon discovering the *latest update transaction*:
+    - MUST wait `shared_delay` blocks of confirmation for this transaction
+      to publish the pre-signed *settlement transaction*
+
+
+
+
     - MUST wait until the `OP_CHECKSEQUENCEVERIFY` delay has passed (as
     specified by the remote node's `to_self_delay` field) before spending the
     output.
