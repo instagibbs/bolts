@@ -781,6 +781,9 @@ If one side sends an update when it is not its turn, the other side
 can either ignore it (in favor of its own update), or reply with a
 `yield` message to hand the turn over.
 
+Stages of each turn are explicitly tracked and used during
+reconnect.
+
 #### Swapping turns: `yield` and `update_noop`
 
 1. type: 129 (`update_noop`) (`option_simplified_update`)
@@ -815,20 +818,6 @@ A node:
       - MAY send one or more update message or `commitment_signed`:
         - MUST NOT include those changes if it receives an update message or `commitment_signed` in reply.
         - MUST include those changes if it receives a `yield` in reply.
-
-Upon reconnection when `channel_reestablish` is exchanged and
-`option_simplified_update` is negotiated:
-  - If it has sent `commitment_signed` on the other peer's turn without receiving `yield`:
-    - MUST NOT consider that `commitment_signed` sent.
-  - If a node sent `next_commitment_number` which exceeds its received
-    `next_revocation_number`, that node's turn is unfinished.
-  - If exactly one node's turn is unfinished, it is their turn,
-    otherwise the turn starts with the peer with the lesser
-    SEC1-encoded node_id.
-  - If a node's turn was unfinished:
-    - That node MUST retransmit the same updates as their previous turn.
-    - The receiving node MAY close the channel if it receives different updates
-      to the previously unfinished turn.
 
 #### Rationale
 
@@ -867,6 +856,76 @@ Since upgrading to enable `option_simplified_update` will require a
 quiescent period, there can be no issue with retransmission from
 before `option_simplified_update` applied.
 
+# Simplified Channel Reestablishment
+
+This message is used in place of `channel_reestablish` if and only
+if the channel was opened with `option_simplified_update`
+
+1. type: 136 (`channel_reestablish_simple`)
+2. data:
+   * [`channel_id`:`channel_id`]
+   * [`u64`:`local_commitment_number`]
+   * [`u64`:`remote_commitment_number`]
+   * [`byte`:`turn`]
+   * [`byte`:`stage`]
+   * [`32*byte`:`your_last_per_commitment_secret`]
+   * [`point`:`my_current_per_commitment_point`]
+
+## Stages
+
+These are stage numbers which are communicated on reestablishment
+to report the latest stage the peer has entered, from their
+point of view. Stages are entered by the relevant messages being
+sent or received.
+
+0: `update_*`
+  * updates to commitment transaction, including fees
+1: offerer's `commitment_signed`:
+2: receiver's `revoke_and_ack` + `commitment_signed` 
+
+## Requirements
+
+A node during reconnection and on sending `channel_reestablish_simple`
+  - MUST set `local_commitment_number` to the latest commitment number
+    for the local node that it has sent a `commitment_signed` for, during
+    its own turn. Messages sent prior to a node's turn are only counted
+    after the `yield` is received, meaning acceptance of the turn switching over.
+  - MUST set `remote_commitment_number` to the latest accepted commitment
+    number from the peer
+  - MUST set `turn` to the index of the peer(FIXME HOW), local or remote, to indicate
+    who's turn it is from the local node's vantage point
+  - MUST set `stage` to the stage number as defined above
+
+Upon reconnection when `channel_reestablish_simple` is exchanged and
+`option_simplified_update` is negotiated:
+  - If it has sent `commitment_signed` on the other peer's turn without receiving `yield`:
+    - MUST NOT consider that `commitment_signed` sent with respect to the reestablishment
+      values.
+  - If the peers agree on who's turn it is:
+    - That node's turn is unfinished
+    - If the stage numbers differ, the peer with the larger `stage` number must
+      retransmit their last message to continue the protocol as prior
+    - If stage numbers match, this means the turn-taker should continue onto the next stage
+      of the protocol
+    - different in stage numbers should be exactly 0 or 1
+  - If the peers disagree:
+    - If the `stage` numbers are exactly `0` and `2`:
+      - It is still the turn of corresponding user being stated as still in stage `2`
+        and this node must retransmit their final `revoke_and_ack` to complete
+        their turn 
+    - otherwise:
+      - FIXME there is an inconsistency and someone lost a message
+
+## Rationale
+
+If a node sends a `commitment_signed` out of turn, it must wait for a yield
+to count that commitment as the latest during reconnect. Otherwise there
+can be confusion about who's turn it was.
+
+Since determining whose turn it is at any given point is a distributed
+systems problem, each side may have a different view of the issue.
+This is resolved using simple rules on reconnect to track what the last
+step was for each node.
 
 ### Forwarding HTLCs
 
