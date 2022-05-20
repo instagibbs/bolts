@@ -73,7 +73,7 @@ messages to reduce the required amount of p2p changes and state. These naive upd
 * locktime: 500000000+o+k, where `o` equals the state-masking offset and `k` equals the channel state version
 * txin count: 1
    * `txin[0]` outpoint: `txid` and `output_index` from latest state `k` output (can be 0, the funding output)
-   * `txin[0]` sequence: 0xFFFFFFFE
+   * `txin[0]` sequence: 0xFFFFFFFD, to allow [BIP125](https://github.com/bitcoin/bips/blob/master/bip-0125.mediawiki#summary) replacement
    * `txin[0]` script bytes: 0
    * `txin[0]` witness: `<signature_for_pubkey1> <signature_for_pubkey2>`
 * txout count: 1
