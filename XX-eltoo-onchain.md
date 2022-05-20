@@ -190,9 +190,11 @@ FIXME: Define rebinding precisely
 
 A node:
   - upon discovering a *stale update transaction*:
-    - if the node does not have its own untrimmed `to_node` output or untrimmed inbound
-      HLTC output, no action is required
-    - MUST respond by publishing the latest update transaction, re-bound
+    - SHOULD estimate the cost of updating to the latest update transaction
+      and settlement transaction, weighing it against the value owed to the
+      user. In the case of no `to_node` outputs to itself or HLTC outputs, there is no incentive
+      to claim the latest channel state.
+    - Otherwise, MUST respond by publishing the latest update transaction, re-bound
       to the stale update transactions' first output
     FIXME need to define exactly how many blocks we should be waiting before freaking out
     - if the latest update transaction is then confirmed within X blocks:
@@ -203,6 +205,10 @@ A node:
         update transaction outputs being spent by a stale settlement transaction
 
 ## Rationale 
+
+In the case where we unconditionally aren't owed any funds for the latest settlement
+transaction, there is no need to spend funds to recover those funds. Otherwise,
+if it economically makes sense, the node wants the latest state to be confirmed.
 
 # Unilateral Close Handling: Latest Update and Settlement Transaction
 
@@ -219,7 +225,41 @@ A node:
       to publish the pre-signed *settlement transaction*
 
 
+# Unilateral Close Handling: Stale Settlement Transaction
 
+In the case of a stale update maturing and the settlement transaction
+confirmed on the blockchain, the node must simply accept whatever
+outputs it is given, even though this is an exception case. Depending
+on level of staleness and channel state, a significant fraction of funds
+may be recovered this way.
+
+## Requirements
+
+A node:
+  - upon discovering a *stale settlement transaction*:
+    - MUST attempt to sweep any redeemable HTLC outputs
+      - HTLC preimages may have been forgotten by the client to decrease
+        client state
+      - HTLC timeouts to claw back offered HTLC outputs can be utilized
+        once the CLTV clause on the output has matured
+    - MAY attempt to sweep its own `to_node` output
+    - MAY continue attempting to publish the latest update and settlement
+      transactions until the latest state output is irrevocably resolved
+        - this can be done at a high feerate versus the sweep to allow recovery of final
+          state in the case of blockchain reorganization
+
+## Rationale
+
+It's not over until the state output is irrevocably resolved. Continue trying to
+enforce correct behavior until our subjective finality limit.
+
+# Unilateral Close Handling: Latest Settlement Transaction
+
+A node:
+  - upon discovering the *latest settlement transaction*:
+    - MUST attemp to resolve HTLCs within the timeout windows allotted
+      by the CLTV in the outputs
+    - MAY sweep its `to_node` output
 
     - MUST wait until the `OP_CHECKSEQUENCEVERIFY` delay has passed (as
     specified by the remote node's `to_self_delay` field) before spending the
