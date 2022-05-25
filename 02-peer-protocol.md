@@ -862,10 +862,26 @@ to report the latest stage the peer has entered, from their
 point of view. Stages are entered by the relevant messages being
 sent or received.
 
-0: `update_*`
-  * updates to commitment transaction, including fees
-1: offerer's `commitment_signed`:
-2: receiver's `revoke_and_ack` + `commitment_signed` 
+### 0: `update_*`
+
+This stage is when you have sent any transaction updates during your turn,
+or received updates during the other node's turn(including when you `yield`
+to out of turn updates.
+
+### 1: offerer's `commitment_signed`:
+
+This stage is when the offerer has sent their `commitment_signed`, or the receiver
+has received this message.
+
+### 2: receiver's `revoke_and_ack` + `commitment_signed` 
+
+This stage is for when the HTLC-receiver has sent their `revoke_and_ack` or `commitment_signed`
+, or the HTLC-offerer receiving those messages.
+
+### Back to 0
+
+If the final `revoke_and_ack` has been sent or received, that wraps around to stage 0,
+thus ending the turn of the current turn-taker.
 
 ## Requirements
 
