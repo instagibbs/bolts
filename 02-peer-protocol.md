@@ -843,7 +843,7 @@ before `option_simplified_update` applied.
 # Simplified Channel Reestablishment
 
 This message is used in place of `channel_reestablish` if and only
-if the channel was opened with `option_simplified_update`
+if the channel has `option_simplified_update`negotiated.
 
 1. type: 136 (`channel_reestablish_simple`)
 2. data:
