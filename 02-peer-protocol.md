@@ -848,7 +848,7 @@ if the channel has `option_simplified_update`negotiated.
 1. type: 136 (`channel_reestablish_simple`)
 2. data:
    * [`channel_id`:`channel_id`]
-   * [`u64`:`local_commitment_number`]
+   * [`u64`:`local_commitment_number`] # FIXME, turn this into a sorted array to allow for indexable comparison?
    * [`u64`:`remote_commitment_number`]
    * [`byte`:`turn`]
    * [`byte`:`stage`]
@@ -904,13 +904,20 @@ Upon reconnection when `channel_reestablish_simple` is exchanged between peers a
 `option_simplified_update` is negotiated:
   - If the peers agree on whose turn it is:
     - That node's turn is unfinished
-    - If the stage numbers differ, the peer with the larger `stage` number must
-      retransmit their last message to continue the protocol as before disconnection
-    - If stage numbers match, this means no retransmission is required, and the protocol
-      continues onto the next stage as before disconnection
+    - If the stage numbers differ:
+      - the peer with the larger `stage` number must
+        retransmit their last message to continue the protocol as before disconnection
+      - if the message to retransmit is a `commitment_signed`, the retransmitter's local
+        commitment number must be exactly one larger than than the receiver's remote commitment
+        number
+        than the remote's remote copy
+    - If stage numbers match:
+      - no retransmission is required, and the protocol
+        continues onto the next stage as before disconnection
+      - all commitment number pairs must match
     - different in stage numbers should be exactly 0 or 1
   - If the peers disagree on whose turn it is:
-    - If the `stage` numbers are exactly `0` and `2`:
+    - If the `stage` numbers are exactly `0` or `1`, and `2`:
       - It is still the turn of corresponding user in the turn tuple that is stage `2`
         and this node must retransmit their final `revoke_and_ack` to complete
         their turn 
