@@ -853,17 +853,18 @@ if the channel has `option_simplified_update`negotiated.
 
 ## Requirements
 
+For both `commitment_numbers` and `revocation_numbers`, nodes are indexed by sorting SEC1-encoded `node_id`s in ascending order
+for all nodes in the channel. This allows comparisons of values per index to detect state view differences.
+
 A node during reconnection and on sending `channel_reestablish_simple`
-  - MUST set `commitment_numbers` to the values of the latest commitment numbers of each node, indexed by
-    the lexigraphically sorted (in ascending order) SEC1-encoded `node_id`s:
+  - MUST set `commitment_numbers` to the values of the latest commitment numbers of each node:
     - for the local index: MUST set value to the local commitment number it has received a `commitment_signed`
       for, during the other node's turn. Messages received prior to the other node's turn are only counted
       after the `yield` is sent, meaning acceptance of the turn switching over.
     - for the remote index: MUST set the value to the remote commitment number in the latest sent `commitment_signed`
       message that was either sent during the local node's turn or accepted by the remote peer via a `yield`
       when sent optimistically.
-  - MUST set `revocation_numbers` to the values of the latest revocation numbers of each node, indexed by
-    the lexigraphically sorted (in ascending order) SEC1-encoded `node_id`s:
+  - MUST set `revocation_numbers` to the values of the latest revocation numbers of each node:
     - for the local index: MUST set value to the latest local commitment number it has revoked by sending a
       `revoke_and_ack` message
     - for the remote index: MUST set the value to the latest remote commitment number that has been revoked
@@ -893,11 +894,10 @@ Since determining whose turn it is at any given point is a consensu problem,
 each side may have a different view of the issue. This is resolved using simple
 rules on reconnect to track what the last step was for each node.
 
-The addition of sent values allows us to rediscover exactly where were to minimize
-retransmission of messages.
+The addition of sent values allows us to rediscover exactly what step of the protocol we're in
+to reduce retransmission of messages.
 
 Values at each index should remain within a difference of 1, otherwise this implies a bug in turn-taking.
-
 
 ### Forwarding HTLCs
 
