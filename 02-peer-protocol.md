@@ -836,25 +836,6 @@ A more complex implementation can optimistically send a complete set
 of updates and `commitment_signed`, but must handle the possibility of
 that commitment being spent on-chain even if the peer does not yield.
 
-Note that the reconnection logic is similarly simplified for an
-implementation which always waits for `yield`: both nodes cannot have
-a commitment in flight simultanously, so if messages are lost due to
-disconnection that is detectable and it simply replays its turn.  If
-an implementation optimistically sends `commitment_signed`, then it
-assumes was either lost and does not apply, or the `yield` reply was
-lost and the `next_commitment_number` test will correctly indicate its
-turn.
-
-The requirement for exact replay again means that commitments at the
-same height will always match.
-
-Note that if a channel always uses `option_simplified_update` then the
-revocation and commitment numbers will be equal on both sides (except
-when an update is in progress), but this is not true if a channel
-previously operated without this option.  However, the "more
-commitments sent than revocations received" test will still indicate
-which side has uncommitted changes.
-
 Since upgrading to enable `option_simplified_update` will require a
 quiescent period, there can be no issue with retransmission from
 before `option_simplified_update` applied.
