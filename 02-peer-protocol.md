@@ -883,38 +883,40 @@ This stage is for when the HTLC-receiver has sent their `revoke_and_ack` or `com
 If the final `revoke_and_ack` has been sent or received, that wraps around to stage 0,
 thus ending the turn of the current turn-taker.
 
+For nomenclature, we refer to the turn-taker and stage number as the "turn tuple".
+
 ## Requirements
 
 A node during reconnection and on sending `channel_reestablish_simple`
   - MUST set `local_commitment_number` to the latest commitment number
-    for the local node that it has sent a `commitment_signed` for, during
-    its own turn. Messages sent prior to a node's turn are only counted
-    after the `yield` is received, meaning acceptance of the turn switching over.
-  - MUST set `remote_commitment_number` to the latest accepted commitment
-    number from the peer
-  - MUST set `turn` to the index of the peer(FIXME HOW), local or remote, to indicate
-    who's turn it is from the local node's vantage point
-  - MUST set `stage` to the stage number as defined above
+    for the local node that it has received a `commitment_signed` for, during
+    the other node's turn. Messages received prior to the other node's turn are only counted
+    after the `yield` is sent, meaning acceptance of the turn switching over.
+  - MUST set `remote_commitment_number` to the latest sent `commitment_signed` commitment
+    number that was either sent during the local node's turn or accepted by the remote peer via
+    a `yield` if sent optimistically.
+  - MUST set `turn` to the index of the peer to indicate who's turn it is from the local node's
+    vantage point, with index sorted in ascending order by
+    peer's SEC1-encoded node_id
+  - MUST set `stage` to the stage number as defined above in `Stages`
 
-Upon reconnection when `channel_reestablish_simple` is exchanged and
+Upon reconnection when `channel_reestablish_simple` is exchanged between peers after
 `option_simplified_update` is negotiated:
-  - If it has sent `commitment_signed` on the other peer's turn without receiving `yield`:
-    - MUST NOT consider that `commitment_signed` sent with respect to the reestablishment
-      values.
-  - If the peers agree on who's turn it is:
+  - If the peers agree on whose turn it is:
     - That node's turn is unfinished
     - If the stage numbers differ, the peer with the larger `stage` number must
-      retransmit their last message to continue the protocol as prior
-    - If stage numbers match, this means the turn-taker should continue onto the next stage
-      of the protocol
+      retransmit their last message to continue the protocol as before disconnection
+    - If stage numbers match, this means no retransmission is required, and the protocol
+      continues onto the next stage as before disconnection
     - different in stage numbers should be exactly 0 or 1
-  - If the peers disagree:
+  - If the peers disagree on whose turn it is:
     - If the `stage` numbers are exactly `0` and `2`:
-      - It is still the turn of corresponding user being stated as still in stage `2`
+      - It is still the turn of corresponding user in the turn tuple that is stage `2`
         and this node must retransmit their final `revoke_and_ack` to complete
         their turn 
     - otherwise:
-      - FIXME there is an inconsistency and someone lost a message
+      - MUST fail the channel
+  
 
 ## Rationale
 
@@ -922,10 +924,11 @@ If a node sends a `commitment_signed` out of turn, it must wait for a yield
 to count that commitment as the latest during reconnect. Otherwise there
 can be confusion about who's turn it was.
 
-Since determining whose turn it is at any given point is a distributed
-systems problem, each side may have a different view of the issue.
-This is resolved using simple rules on reconnect to track what the last
-step was for each node.
+Since determining whose turn it is at any given point is a consensu problem,
+each side may have a different view of the issue. This is resolved using simple
+rules on reconnect to track what the last step was for each node.
+
+Checking the commitment numbers is done as a basic safety check to detect arbitrary failures.
 
 ### Forwarding HTLCs
 
