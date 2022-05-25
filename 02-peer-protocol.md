@@ -848,8 +848,7 @@ if the channel has `option_simplified_update`negotiated.
 1. type: 136 (`channel_reestablish_simple`)
 2. data:
    * [`channel_id`:`channel_id`]
-   * [`u64`:`local_commitment_number`] # FIXME, turn this into a sorted array to allow for indexable comparison?
-   * [`u64`:`remote_commitment_number`]
+   * [`2*u64`:`commitment_numbers`]
    * [`byte`:`turn`]
    * [`byte`:`stage`]
    * [`32*byte`:`your_last_per_commitment_secret`]
@@ -888,16 +887,16 @@ For nomenclature, we refer to the turn-taker and stage number as the "turn tuple
 ## Requirements
 
 A node during reconnection and on sending `channel_reestablish_simple`
-  - MUST set `local_commitment_number` to the latest commitment number
-    for the local node that it has received a `commitment_signed` for, during
-    the other node's turn. Messages received prior to the other node's turn are only counted
-    after the `yield` is sent, meaning acceptance of the turn switching over.
-  - MUST set `remote_commitment_number` to the latest sent `commitment_signed` commitment
-    number that was either sent during the local node's turn or accepted by the remote peer via
-    a `yield` if sent optimistically.
+  - MUST set `commitment_numbers` to the values of the latest commitment numbers, indexed by
+    peer's lexigraphically sorted (in ascending order) SEC1-encoded `node_id`:
+    - for the local index: MUST set the local commitment number it has received a `commitment_signed` for, during
+      the other node's turn. Messages received prior to the other node's turn are only counted
+      after the `yield` is sent, meaning acceptance of the turn switching over.
+    - for the remote index: the remote commitment number set by the latest sent `commitment_signed` message that was
+      either sent during the local node's turn or accepted by the remote peer via a `yield`
+      if sent optimistically.
   - MUST set `turn` to the index of the peer to indicate who's turn it is from the local node's
-    vantage point, with index sorted in ascending order by
-    peer's SEC1-encoded node_id
+    vantage point, again with index in ascending order by comparing peer's SEC1-encoded `node_id`
   - MUST set `stage` to the stage number as defined above in `Stages`
 
 Upon reconnection when `channel_reestablish_simple` is exchanged between peers after
