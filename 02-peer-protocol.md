@@ -872,16 +872,14 @@ A node during reconnection and on sending `channel_reestablish_simple`
 
 Upon reconnection when `channel_reestablish_simple` is exchanged between peers after
 `option_simplified_update` is negotiated:
-  - If the `commitment_numbers` on the same index differ between two peers by exactly one:
-    - The peer with that index MUST retransmit the greater `commitment_signed` number message,
+  - If the `commitment_numbers` on the same index differ between two reporting peers:
+    - If the reporting peer at that index is not giving a number exactly one greater, MUST fail the channel
+    - Otherwise, the peer with that index MUST retransmit the greater `commitment_signed` number message,
       and continue with the simplified update protocol
-  - If the `commitment_numbers` on the same index differ between two reporting peers by more than one:
-    - MUST fail the channel
-  - If the `revocation_numbers` on the same index differ between two reporting peers by exactly one:
-    - The peer at that index must retransmit the greater revocation number message,
+  - If the `revocation_numbers` on the same index differ between two reporting peers:
+    - If the reporting peer at that index is not giving a number exactly one greater, MUST fail the channel
+    - Otherwise, the peer with that index MUST retransmit the greater `revoke_and_ack` number message,
       and continue with the simplified update protocol
-  - If the `revocation_numbers` on the same index differ between two reporting peers by more than one:
-    - MUST fail the channel
   - Otherwise, no retransmissions are required and the simplified update protocol can continue
 
 ## Rationale
