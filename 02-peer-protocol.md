@@ -882,6 +882,8 @@ Upon reconnection when `channel_reestablish_simple` is exchanged between peers a
       and continue with the simplified update protocol
   - Otherwise, no retransmissions are required and the simplified update protocol can continue
 
+FIXME Still have to define turns, since the retransmitter isn't necessarily the turn-taker.
+
 ## Rationale
 
 If a node sends a `commitment_signed` out of turn, it must wait for a yield
