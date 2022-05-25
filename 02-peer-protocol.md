@@ -885,10 +885,10 @@ Upon reconnection when `channel_reestablish_simple` is exchanged between peers a
 ## Rationale
 
 If a node sends a `commitment_signed` out of turn, it must wait for a yield
-to count that commitment as the latest during reconnect. Otherwise there
-can be confusion about who's turn it was.
+to count that commitment as the latest during reconnect. Otherwise this will
+cause a divergence in numbers that cannot be reconciled on reconnect.
 
-Since determining whose turn it is at any given point is a consensu problem,
+Since determining whose turn it is at any given point is a consensus problem,
 each side may have a different view of the issue. This is resolved using simple
 rules on reconnect to track what the last step was for each node.
 
