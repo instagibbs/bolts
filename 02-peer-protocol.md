@@ -849,80 +849,39 @@ if the channel has `option_simplified_update`negotiated.
 2. data:
    * [`channel_id`:`channel_id`]
    * [`2*u64`:`commitment_numbers`]
-   * [`byte`:`turn`]
-   * [`byte`:`stage`]
-   * [`32*byte`:`your_last_per_commitment_secret`]
-   * [`point`:`my_current_per_commitment_point`]
-
-## Stages
-
-These are stage numbers which are communicated on reestablishment
-to report the latest stage the peer has entered, from their
-point of view. Stages are entered by the relevant messages being
-sent or received.
-
-### 0: `update_*`
-
-This stage is when you have sent any transaction updates during your turn,
-or received updates during the other node's turn(including when you `yield`
-to out of turn updates.
-
-### 1: offerer's `commitment_signed`:
-
-This stage is when the offerer has sent their `commitment_signed`, or the receiver
-has received this message.
-
-### 2: receiver's `revoke_and_ack` + `commitment_signed` 
-
-This stage is for when the HTLC-receiver has sent their `revoke_and_ack` or `commitment_signed`
-, or the HTLC-offerer receiving those messages.
-
-### Back to 0
-
-If the final `revoke_and_ack` has been sent or received, that wraps around to stage 0,
-thus ending the turn of the current turn-taker.
-
-For nomenclature, we refer to the turn-taker and stage number as the "turn tuple".
+   * [`2*u64`:`revocation_numbers`]
 
 ## Requirements
 
 A node during reconnection and on sending `channel_reestablish_simple`
-  - MUST set `commitment_numbers` to the values of the latest commitment numbers, indexed by
-    peer's lexigraphically sorted (in ascending order) SEC1-encoded `node_id`:
-    - for the local index: MUST set the local commitment number it has received a `commitment_signed` for, during
-      the other node's turn. Messages received prior to the other node's turn are only counted
+  - MUST set `commitment_numbers` to the values of the latest commitment numbers of each node, indexed by
+    the lexigraphically sorted (in ascending order) SEC1-encoded `node_id`s:
+    - for the local index: MUST set value to the local commitment number it has received a `commitment_signed`
+      for, during the other node's turn. Messages received prior to the other node's turn are only counted
       after the `yield` is sent, meaning acceptance of the turn switching over.
-    - for the remote index: the remote commitment number set by the latest sent `commitment_signed` message that was
-      either sent during the local node's turn or accepted by the remote peer via a `yield`
-      if sent optimistically.
-  - MUST set `turn` to the index of the peer to indicate who's turn it is from the local node's
-    vantage point, again with index in ascending order by comparing peer's SEC1-encoded `node_id`
-  - MUST set `stage` to the stage number as defined above in `Stages`
+    - for the remote index: MUST set the value to the remote commitment number in the latest sent `commitment_signed`
+      message that was either sent during the local node's turn or accepted by the remote peer via a `yield`
+      when sent optimistically.
+  - MUST set `revocation_numbers` to the values of the latest revocation numbers of each node, indexed by
+    the lexigraphically sorted (in ascending order) SEC1-encoded `node_id`s:
+    - for the local index: MUST set value to the latest local commitment number it has revoked by sending a
+      `revoke_and_ack` message
+    - for the remote index: MUST set the value to the latest remote commitment number that has been revoked
+      via receiving a `revoke_and_ack` message
 
 Upon reconnection when `channel_reestablish_simple` is exchanged between peers after
 `option_simplified_update` is negotiated:
-  - If the peers agree on whose turn it is:
-    - That node's turn is unfinished
-    - If the stage numbers differ:
-      - the peer with the larger `stage` number must
-        retransmit their last message to continue the protocol as before disconnection
-      - if the message to retransmit is a `commitment_signed`, the retransmitter's local
-        commitment number must be exactly one larger than than the receiver's remote commitment
-        number
-        than the remote's remote copy
-    - If stage numbers match:
-      - no retransmission is required, and the protocol
-        continues onto the next stage as before disconnection
-      - all commitment number pairs must match
-    - different in stage numbers should be exactly 0 or 1
-  - If the peers disagree on whose turn it is:
-    - If the `stage` numbers are exactly `0` or `1`, and `2`:
-      - It is still the turn of corresponding user in the turn tuple that is stage `2`
-        and this node must retransmit their final `revoke_and_ack` to complete
-        their turn 
-    - otherwise:
-      - MUST fail the channel
-  
+  - If the `commitment_numbers` on the same index differ between two peers by exactly one:
+    - The peer with that index MUST retransmit the greater `commitment_signed` number message,
+      and continue with the simplified update protocol
+  - If the `commitment_numbers` on the same index differ between two reporting peers by more than one:
+    - MUST fail the channel
+  - If the `revocation_numbers` on the same index differ between two reporting peers by exactly one:
+    - The peer at that index must retransmit the greater revocation number message,
+      and continue with the simplified update protocol
+  - If the `revocation_numbers` on the same index differ between two reporting peers by more than one:
+    - MUST fail the channel
+  - Otherwise, no retransmissions are required and the simplified update protocol can continue
 
 ## Rationale
 
@@ -934,7 +893,11 @@ Since determining whose turn it is at any given point is a consensu problem,
 each side may have a different view of the issue. This is resolved using simple
 rules on reconnect to track what the last step was for each node.
 
-Checking the commitment numbers is done as a basic safety check to detect arbitrary failures.
+The addition of sent values allows us to rediscover exactly where were to minimize
+retransmission of messages.
+
+Values at each index should remain within a difference of 1, otherwise this implies a bug in turn-taking.
+
 
 ### Forwarding HTLCs
 
