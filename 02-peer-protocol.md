@@ -806,7 +806,8 @@ A node:
     - receiving `revoke_and_ack`
     - receiving a `yield`
   - During this node's turn:
-    - if it receives an update message or `commitment_signed`:
+    - if it receives an update message or a `commitment_signed` that is not a commitment
+      based off of the sender's latest `revoke_and_ack`:
       - if it has sent its own update or `commitment_signed`:
         - MUST ignore the message
       - otherwise:
@@ -818,6 +819,8 @@ A node:
       - MAY send one or more update message or `commitment_signed`:
         - MUST NOT include those changes if it receives an update message or `commitment_signed` in reply.
         - MUST include those changes if it receives a `yield` in reply.
+
+Connection reestablishment under this mode is handled under `channel_reestablish_simple`.
 
 #### Rationale
 
