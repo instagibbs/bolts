@@ -169,10 +169,10 @@ The sender MUST set:
   - `settlement_signature` to the valid signature using its `update_pubkey` for the initial settlement transaction, as defined in [BOLT #3](03-transactions.md#settlement-transaction).
 
 The recipient:
-  - if `update_signature` is incorrect OR non-compliant with LOW-S-standard rule<sup>[LOWS](https://github.com/bitcoin/bitcoin/pull/6769)</sup>:
+  - if `update_signature` is incorrect:
     - MUST send a `warning` and close the connection, or send an
       `error` and fail the channel.
-  - if `settlement_signature` is incorrect OR non-compliant with LOW-S-standard rule<sup>[LOWS](https://github.com/bitcoin/bitcoin/pull/6769)</sup>:
+  - if `settlement_signature` is incorrect:
     - MUST send a `warning` and close the connection, or send an
       `error` and fail the channel.
 
@@ -211,10 +211,10 @@ The sender MUST set:
   - `settlement_signature` to the valid signature, using its `settlement_pubkey` for the initial settlement transaction, as defined in [BOLT #3](03-transactions.md#settlement-transaction).
 
 The recipient:
-  - if `update_signature` is incorrect OR non-compliant with LOW-S-standard rule<sup>[LOWS](https://github.com/bitcoin/bitcoin/pull/6769)</sup>:
+  - if `update_signature` is incorrect:
     - MUST send a `warning` and close the connection, or send an
       `error` and fail the channel.
-  - if `settlement_signature` is incorrect OR non-compliant with LOW-S-standard rule<sup>[LOWS](https://github.com/bitcoin/bitcoin/pull/6769)</sup>:
+  - if `settlement_signature` is incorrect:
     - MUST send a `warning` and close the connection, or send an
       `error` and fail the channel.
   - MUST NOT broadcast the funding transaction before receipt of a valid `funding_signed_eltoo`.
@@ -506,10 +506,10 @@ A sending node:
 A receiving node:
   - during another's turn:
     - once all pending updates are applied:
-      - if `update_signature` is not valid for its local commitment transaction OR non-compliant with LOW-S-standard rule <sup>[LOWS](https://github.com/bitcoin/bitcoin/pull/6769)</sup>:
+      - if `update_signature` is not valid for its local commitment transaction:
         - MUST send a `warning` and close the connection, or send an
           `error` and fail the channel.
-      - if `settlement_signature` is not valid for its local commitment transaction OR non-compliant with LOW-S-standard rule <sup>[LOWS](https://github.com/bitcoin/bitcoin/pull/6769)</sup>:
+      - if `settlement_signature` is not valid for its local commitment transaction:
         - MUST send a `warning` and close the connection, or send an
           `error` and fail the channel.
     - MUST respond with a `commitment_signed_eltoo_ack` message of their own.
@@ -531,10 +531,10 @@ for update and settlement transactions are required at this stage.
 #### Requirements
 
 A receiving node:
-  - if `update_signature` is not valid for its update transaction OR non-compliant with LOW-S-standard rule <sup>[LOWS](https://github.com/bitcoin/bitcoin/pull/6769)</sup>:
+  - if `update_signature` is not valid for its update transaction:
       - MUST send a `warning` and close the connection, or send an
         `error` and fail the channel.
-  - if `update_signature` is not valid for its update transaction OR non-compliant with LOW-S-standard rule <sup>[LOWS](https://github.com/bitcoin/bitcoin/pull/6769)</sup>:
+  - if `update_signature` is not valid for its update transaction:
       - MUST send a `warning` and close the connection, or send an
         `error` and fail the channel.
   - otherwise:
