@@ -358,6 +358,8 @@ A node receiving the `partial_sigs` messaging round:
     - MUST send a `warning` and close the connection, or send an
       `error` and fail the channel.
 
+Fee negotiation is followed as required in parallel.
+
 #### Rationale
 
 We use MuSig2 multisignature algorithm to close eltoo channels. This allows a healthy
