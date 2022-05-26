@@ -76,10 +76,7 @@ FIXME do we want to "mix" the version offset in these opening messages somehow?
 
 FIXME Going from `to_self_delay` to `shared_delay` means both sides have to agree on a single number.
 This likely requires a new round of interaction on channel open like closing fee negotiation.
-Also probably required for `dust_limit_satoshis`
-
-FIXME do we want all HLTCs to have unique pubkeys now that state is symmetrical? Previously it was obvious
-to group HTLCs due to asymmetry
+FIXME Also probably required for `dust_limit_satoshis`
 
 Changed fields from `open_channel`:
   - `to_self_delay` is replaced with a symmetrical `shared_delay` which must be agreed upon by nodes
