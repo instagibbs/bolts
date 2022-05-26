@@ -541,7 +541,8 @@ A receiving node:
 
 ### Updating Fees: `update_fee`
 
-No fees are attached to update or settlement transactions.
+No fees are attached to update or settlement transactions, so this message is
+unused.
 
 ### Requirements
 
