@@ -241,6 +241,7 @@ The following convenience types are also defined:
 * `short_channel_id`: an 8 byte value identifying a channel (see [BOLT #7](07-routing-gossip.md#definition-of-short-channel-id))
 * `bigsize`: a variable-length, unsigned integer similar to Bitcoin's CompactSize encoding, but big-endian.  Described in [BigSize](#appendix-a-bigsize-test-vectors).
 * `nonce`: a 66-byte public nonce for [MuSig2](https://github.com/jonasnick/bips/blob/musig2/bip-musig2.mediawiki) signatures. BIP340 public keys are transmitted as `point` messages to retain y-coordinate information until applied on-chain.
+* `partial_sig`: a 32-byte [MuSig2](https://github.com/jonasnick/bips/blob/musig2/bip-musig2.mediawiki) partial signature
 
 ## Setup Messages
 
