@@ -360,10 +360,9 @@ A node receiving the `partial_sigs` messaging round:
 
 #### Rationale
 
-Since mutual closing is already an interactive process, we can add an additional
-sharing of nonces to complete a 2-round MuSig2 signature. This allows a healthy
-operating channel to appear to be a single pubkey output, aside from LN gossip
-information.
+We use MuSig2 multisignature algorithm to close eltoo channels. This allows a healthy
+operating channel to appear to be a single pubkey output even after being spent,
+reducing fees in the common case.
 
 First round is parties sending each other nonces and completing fee negotiation,
 the second round results in partial signatures being passed to all parties, resulting
