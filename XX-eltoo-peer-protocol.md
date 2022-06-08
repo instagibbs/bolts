@@ -72,21 +72,21 @@ commitment transaction.
 
 #### Requirements
 
-FIXME do we want to "mix" the version offset in these opening messages somehow?
-
-FIXME Going from `to_self_delay` to `shared_delay` means both sides have to agree on a single number.
-This likely requires a new round of interaction on channel open like closing fee negotiation.
-FIXME Also probably required for `dust_limit_satoshis`
-
 Changed fields from `open_channel`:
-  - `to_self_delay` is replaced with a symmetrical `shared_delay` which must be agreed upon by nodes
-  - `dust_limit_satoshis` must be agree upon by all parties
+  - `to_self_delay` is replaced with a symmetrical `shared_delay` which must be agreed upon by nodes. This is currently set by the opener.
+  - `dust_limit_satoshis` must be shared, and is currently set by the opener. A negotiation protocol can be added in future versions.
   - there is no `revocation_basepoint` as the security of the eltoo design does not rely on penalty transactions
   - there is no `delayed_payment_basepoint`, as there are no second-stage HTLC transactions to be pre-signed
   - `payment_basepoint` is replaced with a static `settlement_pubkey`
   - no `feerate_per_kw` as there is no up-front negotiated fee for update or settlement transactions
   - `htlc_basepoint` is replaced by `htlc_pubkey`
   - `first_per_commitment_point` is removed
+
+Sending node:
+  - SHOULD set `shared_delay` to a reasonable number
+
+A receiving node:
+  - MUST either accept the `shared_delay` given by the sender, of fail the channel
 
 #### Rationale
 
@@ -136,6 +136,10 @@ versions of the commitment transaction.
 #### Requirements
 
 The same requirements as `accept_channel`, except a few redundant fields removed.
+
+Sending node:
+  - MUST set `dust_limit_satoshis` to the same value as set in `open_channel`
+  - MUST set `shared_delay` to the same value as set in `open_channel`
 
 #### Rationale
 

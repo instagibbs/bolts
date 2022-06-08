@@ -54,7 +54,8 @@ A `<>` designates an empty vector as required for compliance with MINIMALIF-stan
 * The funding output script is a P2TR to:
 
 `sorted_pubkey1, sorted_pubkey2 = KeySort(pubkey1, pubkey2)`
-`tr(KeyAgg(sorted_pubkey1, sorted_pubkey2), EXPR)`
+`aggregated_key = KeyAgg(sorted_pubkey1, sorted_pubkey2)`
+`tr(aggregated_key, EXPR)`
 
 where
 
@@ -66,25 +67,27 @@ where
 
 * Where `0_*` indicates a 0-byte prepended ANYPREVOUT version of the public key, as per BIP118.
 
+* Leaf version of 0
+
 The key-spend path is used during collaborative channel closes, while for simplicity naive signature aggregation is used for update
 messages to reduce the required amount of p2p changes and state. These naive updates can be converted to MuSig2 on a future version.
 
 ## Update Transaction
 
 * version: 2
-* locktime: 500000000+o+k, where `o` equals the state-masking offset and `k` equals the channel state version
+* locktime: 500000000+o+k, where `o` equals the state-masking offset(always 0 for now) and `k` equals the channel state version
 * txin count: 1
    * `txin[0]` outpoint: `txid` and `output_index` from latest state `k` output (can be 0, the funding output)
    * `txin[0]` sequence: 0xFFFFFFFD, to allow [BIP125](https://github.com/bitcoin/bips/blob/master/bip-0125.mediawiki#summary) replacement
    * `txin[0]` script bytes: 0
-   * `txin[0]` witness: `<signature_for_pubkey1> <signature_for_pubkey2>`
+   * `txin[0]` witness: `signature_for_sorted_pubkey2 signature_for_sorted_pubkey1`
 * txout count: 1
    * `txout[0]` amount: the HTLC amount minus fees (see [Fee Calculation](#fee-calculation))
-   * `txout[0]` script: `tr(MuSig2(<pubkey1>, <pubkey2>), EXPR)`
+   * `txout[0]` script: `tr(aggregated_key, EXPR)`
 
 where EXPR =
 
-`<locktime+1>` OP_CLTV OP_DROP 0 0<pubkey1> OP_CHECKSIGADD 0<pubkey2> OP_CHECKSIGADD 2 OP_EQUAL`
+`<locktime+1>` OP_CLTV OP_DROP 0 0_sorted_pubkey1 OP_CHECKSIGADD 0_sorted_pubkey2 OP_CHECKSIGADD 2 OP_EQUAL`
 
 and where `signature_for_pubkey1 and `signature_for_pubkey1` use SIGHASH_SINGLE|ANYPREVOUTANYSCRIPT.
 
@@ -98,9 +101,9 @@ Note that the locktime must increase monotonically as it's used as the consensus
    * `txin[0]` outpoint: `txid` and `output_index` from latest committed state `k` output
    * `txin[0]` sequence: set to `shared_delay`, initially set in channel open negotiation
    * `txin[0]` script bytes: 0
-   * `txin[0]` witness: `<signature_for_pubkey1> <signature_for_pubkey2>`
+   * `txin[0]` witness: `signature_for_sorted_pubkey2 signature_for_sorted_pubkey1`
 
-where `signature_for_pubkey1 and `signature_for_pubkey1` use SIGHASH_ALL|ANYPREVOUT.
+where `signature_for_sorted_pubkey1 and `signature_for_sorted_pubkey2` use SIGHASH_ALL|ANYPREVOUT.
 
 Note there may be additional attached transaction inputs due to the ANYPREVOUT signatures which can be used to attach fees during settlement.
 
@@ -134,8 +137,7 @@ Since these outputs can be immediately spent, they can be used for CPFP fee bump
 The output encumbers funds to the receipient of the HTLC offer with a primage, or back to the offerer upon
 timeout. Unlike BOLT03, these require no second stage transactions, and can be signed at any point.
 
-`tr(MuSig2(<pubkey1>, <pubkey2>), {SUCCESS, TIMEOUT})`
-FIXME leaves need to have defined leaf type? switch to miniscript notation?
+`tr(aggregated_key, {SUCCESS, TIMEOUT})`
 
 where SUCCESS =
 
@@ -145,7 +147,9 @@ and TIMEOUT =
 
     <timeout sufficient for safety> OP_CLTV <offerer_funding_pubkey> OP_CHECKSIG
 
-with the same pubkeys and ordering as the funding transaction output. The key-spend path is currently unused.
+* With the leaf version of 0
+
+* With the same pubkeys and ordering as the funding transaction output. The key-spend path is currently unused.
 
 The recipient node can redeem the HTLC with the witness:
 
@@ -158,8 +162,6 @@ And the offerer via:
 with the proper nLocktime set
 
 ### Trimmed Outputs
-
-FIXME figure out dust limit stuff, consensus problem again?
 
 Peers agree on a `dust_limit_satoshis` below which outputs should
 not be produced; these outputs that are not produced are termed "trimmed". A trimmed output is
