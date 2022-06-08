@@ -53,15 +53,18 @@ A `<>` designates an empty vector as required for compliance with MINIMALIF-stan
 
 * The funding output script is a P2TR to:
 
-`tr(KeyAgg(KeySort(<pubkey1>, <pubkey2>)), EXPR)`
+`sorted_pubkey1, sorted_pubkey2 = KeySort(pubkey1, pubkey2)`
+`tr(KeyAgg(sorted_pubkey1, sorted_pubkey2), EXPR)`
 
 where
 
-`EXPR = 0 0<pubkey1> OP_CHECKSIGADD 0<pubkey2> OP_CHECKSIGADD 2 OP_EQUAL`
+`EXPR = 0 0_sorted_pubkey1 OP_CHECKSIGADD 0_sorted_pubkey2 OP_CHECKSIGADD 2 OP_EQUAL`
 
 * As defined by [BIP386](https://github.com/bitcoin/bips/blob/master/bip-0386.mediawiki#tr) and abused by the author.
 
 * Where `KeyAgg` and `KeySort` are defined as per BIP-musig2.
+
+* Where `0_*` indicates a 0-byte prepended ANYPREVOUT version of the public key, as per BIP118.
 
 The key-spend path is used during collaborative channel closes, while for simplicity naive signature aggregation is used for update
 messages to reduce the required amount of p2p changes and state. These naive updates can be converted to MuSig2 on a future version.
@@ -81,7 +84,6 @@ messages to reduce the required amount of p2p changes and state. These naive upd
 
 where EXPR =
 
-FIXME: define the key ordering correctly with the sorting
 `<locktime+1>` OP_CLTV OP_DROP 0 0<pubkey1> OP_CHECKSIGADD 0<pubkey2> OP_CHECKSIGADD 2 OP_EQUAL`
 
 and where `signature_for_pubkey1 and `signature_for_pubkey1` use SIGHASH_SINGLE|ANYPREVOUTANYSCRIPT.
