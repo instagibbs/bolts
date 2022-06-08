@@ -53,8 +53,7 @@ A `<>` designates an empty vector as required for compliance with MINIMALIF-stan
 
 * The funding output script is a P2TR to:
 
-FIXME: define a sorted MuSig2 ordering macro
-`tr(MuSig2(<pubkey1>, <pubkey2>), EXPR)`
+`tr(KeyAgg(KeySort(<pubkey1>, <pubkey2>)), EXPR)`
 
 where
 
@@ -62,7 +61,7 @@ where
 
 * As defined by [BIP386](https://github.com/bitcoin/bips/blob/master/bip-0386.mediawiki#tr) and abused by the author.
 
-* Where `pubkey1` is the lexicographically lesser of the two `funding_pubkey` in compressed format, and where `pubkey2` is the lexicographically greater of the two, and each public key has `0` prepended onto the data push to indicate ANYPREVOUT signature.
+* Where `KeyAgg` and `KeySort` are defined as per BIP-musig2.
 
 The key-spend path is used during collaborative channel closes, while for simplicity naive signature aggregation is used for update
 messages to reduce the required amount of p2p changes and state. These naive updates can be converted to MuSig2 on a future version.
