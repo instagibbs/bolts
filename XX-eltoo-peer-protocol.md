@@ -584,6 +584,7 @@ Upon reconnection when `channel_reestablish_eltoo` is exchanged by all channel p
   - If both local and remote `next_commitment_number`s are identical:
     - signatures from the non-turn-taker can be applied to the turn-taker's
       transaction if not previously received before disconnect
+      - If this signature does not validate, MUST fail the channel
     - a new turn then starts with the peer with the lesser
       SEC1-encoded node_id.
   - If the local and remote node's `last_commitment_number` is exactly one different:
