@@ -559,7 +559,9 @@ A receiving node:
 1. type: 32773 (`channel_reestablish_eltoo`)
 2. data:
    * [`channel_id`:`channel_id`]
-   * [`u64`:`next_commitment_number`]
+   * [`u64`:`last_commitment_number`]
+   * [`signature`:`update_signature`]
+   * [`signature`:`settlement_signature`]
 
 #### Requirements
 
@@ -568,24 +570,42 @@ to the penalty-based simplified update scheme, with
 the extraneous fields removed, and using the `_eltoo`
 based messages respectively.
 
-Upon reconnection when `channel_reestablish_eltoo` is exchanged:
+A sending node:
+  - MUST set `last_commitment_number` to the value of the channel state number of the last
+    pair of update and settlement transactions the node has sent signatures of to its peer.
   - If it has sent `commitment_signed_eltoo` on the other peer's turn without receiving `yield`:
-    - MUST NOT consider that `commitment_signed_eltoo` sent when setting `channel_reestablish` fields.
-  - If a node's sent `next_commitment_number` is one less than its received
-    `next_commitment_number`, that node's turn is unfinished.
-    - due to symmetrical state of eltoo and simplified operation only,
-      there can only be one unfinished side
-  - else if both sent and received `next_commitment_number`s are identical:
-    - the turn starts with the peer with the lesser
+    - MUST NOT consider that `commitment_signed_eltoo` sent when setting `last_commitment_number`.
+  - MUST set `update_signature` and `settlement_signature` to the corresponding channel state
+    transaction signatures from the `last_commitment_number`.
+
+A receiving node:
+
+Upon reconnection when `channel_reestablish_eltoo` is exchanged by all channel peers:
+  - If both local and remote `next_commitment_number`s are identical:
+    - signatures from the non-turn-taker can be applied to the turn-taker's
+      transaction if not previously received before disconnect
+    - a new turn then starts with the peer with the lesser
       SEC1-encoded node_id.
+  - If the local and remote node's `last_commitment_number` is exactly one different:
+      - The turn is aborted. All pending updates are removed, next state number is one greater
+        than the largest reported state number, and a new turn starts with the peer with
+        the lesser SEC1-encoded node_id.
+      - Offering nodes MUST be able to handle the aborted turns' update transaction, settlement transaction,
+        and resolved HTLCs on-chain.
   - otherwise:
-    - ??? FIXME We can just send them the latest state if we're being nice
+    - ??? FIXME must be something we can do here to be nice to the peer that forgot stuff.
+      Ahead node can just convince the peer of latest state and share the entire tx?
 
 #### Rationale
 
 Due to symmetry and lack of penalty transactions, we only need to
 communicate to the remote node which state we are on, which should match
-the number they send as well.
+the number they send as well. If they don't match, this indicates an unfinished turn
+or error.
+
+This assumes that HTLCs are not fast-forwarded until after a `commitment_signed_eltoo_ack`
+has been sent back to the offerer(and persisted). This allows for more reliable forwarding
+during reconnects without requiring extensive retransmission.
 
 # Authors
 
