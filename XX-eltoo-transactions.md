@@ -59,7 +59,7 @@ A `<>` designates an empty vector as required for compliance with MINIMALIF-stan
 
 where
 
-`EXPR = 0 0_sorted_pubkey1 OP_CHECKSIGADD 0_sorted_pubkey2 OP_CHECKSIGADD 2 OP_EQUAL`
+`EXPR = 0_sorted_pubkey1 OP_CHECKSIG 0_sorted_pubkey2 OP_CHECKSIGVERIFY`
 
 * As defined by [BIP386](https://github.com/bitcoin/bips/blob/master/bip-0386.mediawiki#tr) and abused by the author.
 
@@ -87,7 +87,7 @@ messages to reduce the required amount of p2p changes and state. These naive upd
 
 where EXPR =
 
-`<locktime+1>` OP_CLTV OP_DROP 0 0_sorted_pubkey1 OP_CHECKSIGADD 0_sorted_pubkey2 OP_CHECKSIGADD 2 OP_EQUAL`
+`<locktime+1>` OP_CLTV 0_sorted_pubkey1 OP_CHECKSIG 0_sorted_pubkey2 OP_CHECKSIGVERIFY`
 
 and where `signature_for_pubkey1 and `signature_for_pubkey1` use SIGHASH_SINGLE|ANYPREVOUTANYSCRIPT.
 
