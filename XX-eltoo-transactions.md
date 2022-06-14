@@ -67,7 +67,7 @@ where
 
 * Where `0_*` indicates a 0-byte prepended ANYPREVOUT version of the public key, as per BIP118.
 
-* Leaf version of 0
+* Leaf version of 0xC0
 
 The key-spend path is used during collaborative channel closes, while for simplicity naive signature aggregation is used for update
 messages to reduce the required amount of p2p changes and state. These naive updates can be converted to MuSig2 on a future version.
@@ -147,7 +147,7 @@ and TIMEOUT =
 
     <timeout sufficient for safety> OP_CLTV <offerer_funding_pubkey> OP_CHECKSIG
 
-* With the leaf version of 0
+* With the leaf version of 0xC0
 
 * With the same pubkeys and ordering as the funding transaction output. The key-spend path is currently unused.
 
