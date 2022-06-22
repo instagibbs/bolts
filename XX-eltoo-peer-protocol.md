@@ -95,7 +95,7 @@ requiring additional range negotiation in others.
 
 #### Defined Eltoo Channel Types
 
-Eltoo commitment transactions(also known as update transactions) need no anchor outputs and have
+Eltoo update transactions need no anchor outputs and have
 symmetrical state, which nullifies the requirement for the currently defined `channel_types` for
 ln-penalty-based channels.
 
@@ -106,8 +106,8 @@ The currently defined types are:
 
 This message contains information about a node and indicates its
 acceptance of the new eltoo channel initiated by `open_channel_eltoo`. This
-is the second step toward creating the funding transaction and both
-versions of the commitment transaction.
+is the second step toward creating the funding, update, and settlement
+transactions.
 
 1. type: 32769 (`accept_channel_eltoo`)
 2. data:
@@ -148,7 +148,7 @@ Symmetrical state means fewer parameters are required compared to `accept_channe
 ### The `funding_created_eltoo` Message
 
 This message describes the outpoint which the funder has created for
-the initial commitment transactions. After receiving the peer's
+the initial update and settlement transactions. After receiving the peer's
 signature, via `funding_signed`, it will broadcast the funding transaction.
 
 1. type: 32770 (`funding_created_eltoo`)
@@ -393,7 +393,7 @@ with modifications.
 
 The flow is similar except for the symmetrical state. This means there is no
 `revoke_and_ack` message, meaning all updates are immediately applied to the
-pending commitment transaction and signed with `commitment_signed_eltoo`.
+pending update and settlement transactions and signed with `commitment_signed_eltoo`.
 
 Note that once the recipient of an HTLC offer receives a
 `commitment_signed_eltoo` message, the new offers may be forwarded immediately

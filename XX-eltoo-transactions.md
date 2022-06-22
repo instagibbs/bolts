@@ -47,7 +47,7 @@ enforced here.
 
 Most transaction outputs used here are pay-to-taproot<sup>[BIP341](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#constructing-and-spending-taproot-outputs)</sup> (P2TR) outputs. We are ommitting all non-script related witness stack items for brevity such as control block, inner pubkeys, et al.
 
-A `<>` designates an empty vector as required for compliance with MINIMALIF-standard rule.<sup>[MINIMALIF](https://lists.linuxfoundation.org/pipermail/bitcoin-dev/2016-August/013014.html)</sup>
+A `<>` designates an empty vector as required for compliance with [BIP342](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki)
 
 ## Funding Transaction Output
 
@@ -82,7 +82,7 @@ messages to reduce the required amount of p2p changes and state. These naive upd
    * `txin[0]` script bytes: 0
    * `txin[0]` witness: `signature_for_sorted_pubkey2 signature_for_sorted_pubkey1`
 * txout count: 1
-   * `txout[0]` amount: the HTLC amount minus fees (see [Fee Calculation](#fee-calculation))
+   * `txout[0]` amount: the HTLC
    * `txout[0]` script: `tr(aggregated_key, EXPR)`
 
 where EXPR =
@@ -166,7 +166,7 @@ with the proper nLocktime set
 Peers agree on a `dust_limit_satoshis` below which outputs should
 not be produced; these outputs that are not produced are termed "trimmed". A trimmed output is
 considered too small to be worth creating and is instead added
-to the commitment transaction fee.
+to the settlement transaction fee.
 
 #### Requirements
 
