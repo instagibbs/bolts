@@ -4,6 +4,7 @@ This details the exact format of on-chain transactions, which both sides need to
 
 # Table of Contents
 
+  * [Mempool Policy and Consensus Changes Required](#policy-and-consensus)
   * [Transactions](#transactions)
     * [Transaction Output Ordering](#transaction-output-ordering)
     * [Use of Taproot](#use-of-segwit)
@@ -23,6 +24,43 @@ This details the exact format of on-chain transactions, which both sides need to
   * [Keys](#keys)
   * [References](#references)
   * [Authors](#authors)
+
+# Mempool Policy and Consensus Changes Required
+
+The rest of the document presumes a specific set of mempool policy enhancements and
+consensus changes.
+
+roughly detailed [here](https://gist.github.com/instagibbs/b3095752d6289ab52166c04df55c1c19).
+
+The consensus assumptions are:
+
+1. These transactions assume [BIP118](https://github.com/bitcoin/bips/blob/master/bip-0118.mediawiki) in its current written form.
+1. No SIGHASH_GROUP like functionality, so we either commit via SINGLE or ALL in each situation.
+1. We rely on both the "re-binding" functionality as designed in the original eltoo paper, as well
+as the signature in output covenant trick that was discovered by other researchers.
+
+The policy assumptions and implications in short are roughly detailed [here](https://gist.github.com/instagibbs/b3095752d6289ab52166c04df55c1c19).
+in short:
+
+1. Package relay is implemented and deployed, as per [this link](https://github.com/bitcoin/bips/pull/1324)
+1. All transactions cooperatively created are nVersion==3, which opts into a more restrictive pattern of spending
+  - All transactions are RBF replaceable.
+  - Maximum total package size limited to economically realstic sizes to make RBF replacement
+    efficient. This is a BIP125 rule#3 work-around.
+1. Ephemeral dust outputs are implemented. This allows dust to be standard if and only if it is spent in a relay
+package by a transaction within that package. This enables 0-value anchor outputs.
+
+Alternative designs not implemented:
+
+1. Don't timelock balance outputs in settlement transactions, and rely on mempool carve-out
+in two-party channel setups to avoid mempool limit pinning. HTLC outputs still need to be locked
+and this does not generalize to N-party. It's nice for funds to go directly to a destination
+wallet of arbitrary type, but limiting in other ways. We instead choose to design a system
+that fairly naively scales to N-party channels.
+1. Use SIGHASH_GROUP. This would allow more flexible bring your own fees for settlement
+transactions, as it allows the creation of additional secure change outputs. The motivation
+here is fairly weak, and requires another BIP to be designed, implemented, and accepted
+by the community for limited gain.
 
 # Transactions
 
@@ -153,11 +191,19 @@ The amounts for each output MUST be rounded down to whole satoshis. If this amou
 
 This output sends funds back to the owner of the satoshi amount. It can be claimed without delay. The output is a P2TR of the form:
 
-`rawtr(<settlement_pubkey>)`
+`tr(aggregated_key, BALANCE_EXPR})`
 
-There are `N` copies of this output, one for each channel partner and their associated `settlement_pubkey` sent during channel negotiation.
+where BALANCE_EXPR =
 
-Since these outputs can be immediately spent, they can be used for CPFP fee bumping as required to achieve confirmation.
+`1 OP_CHECKSEQUENCEVERIFY settlement_pubkey OP_CHECKSIG`
+
+There are `N` copies of this output, one for each channel participant and their associated `settlement_pubkey` sent during channel negotiation.
+
+##### Rationale
+
+Ideally, we could directly use a `rawtr(settlement_pubkey)` or even a raw script to allow maximal flexibility,
+but we have mempool package limit considerations to contend with. This means all settlement outputs must be
+timelocked, or we use the carve-out rule in two-party scenarios, but this does not scale to N-party channels.
 
 #### HTLC Outputs
 
