@@ -157,7 +157,6 @@ signature, via `funding_signed`, it will broadcast the funding transaction.
     * [`sha256`:`funding_txid`]
     * [`u16`:`funding_output_index`]
     * [`signature`:`update_signature`]
-    * [`signature`:`settlement_signature`]
 
 #### Requirements
 
@@ -167,13 +166,9 @@ There is no `signature` field sent, or required.
 
 The sender MUST set:
   - `update_signature` to the valid signature using its `funding_pubkey` for the initial update transaction, as defined in [BOLT #3](03-transactions.md#update-transaction).
-  - `settlement_signature` to the valid signature using its `update_pubkey` for the initial settlement transaction, as defined in [BOLT #3](03-transactions.md#settlement-transaction).
 
 The recipient:
   - if `update_signature` is incorrect:
-    - MUST send a `warning` and close the connection, or send an
-      `error` and fail the channel.
-  - if `settlement_signature` is incorrect:
     - MUST send a `warning` and close the connection, or send an
       `error` and fail the channel.
 
@@ -194,7 +189,6 @@ This message introduces the `channel_id` to identify the channel. It's derived f
 2. data:
     * [`channel_id`:`channel_id`]
     * [`signature`:`update_signature`]
-    * [`signature`:`settlement_signature`]
 
 #### Requirements
 
@@ -209,13 +203,9 @@ Both peers:
 The sender MUST set:
   - `channel_id` by exclusive-OR of the `funding_txid` and the `funding_output_index` from the `funding_created_eltoo` message.
   - `update_signature` to the valid signature, using its `update_pubkey` for the initial update transaction, as defined in [BOLT #3](03-transactions.md#update-transaction).
-  - `settlement_signature` to the valid signature, using its `settlement_pubkey` for the initial settlement transaction, as defined in [BOLT #3](03-transactions.md#settlement-transaction).
 
 The recipient:
   - if `update_signature` is incorrect:
-    - MUST send a `warning` and close the connection, or send an
-      `error` and fail the channel.
-  - if `settlement_signature` is incorrect:
     - MUST send a `warning` and close the connection, or send an
       `error` and fail the channel.
   - MUST NOT broadcast the funding transaction before receipt of a valid `funding_signed_eltoo`.
@@ -490,7 +480,6 @@ message over the same transactions to ACK the updates and finalize it.
 2. data:
    * [`channel_id`:`channel_id`]
    * [`signature`:`update_signature`]
-   * [`signature`:`settlement_signature`]
 
 Separating `commitment_signed_eltoo` from `commitment_signed_eltoo_ack` allows for
 slightly simpler logic and disambiguation of message intent.
@@ -509,10 +498,7 @@ A sending node:
 A receiving node:
   - during another's turn:
     - once all pending updates are applied:
-      - if `update_signature` is not valid for its local commitment transaction:
-        - MUST send a `warning` and close the connection, or send an
-          `error` and fail the channel.
-      - if `settlement_signature` is not valid for its local commitment transaction:
+      - if `update_signature` is not valid for update transaction:
         - MUST send a `warning` and close the connection, or send an
           `error` and fail the channel.
     - MUST respond with a `commitment_signed_eltoo_ack` message of their own.
@@ -529,7 +515,6 @@ for update and settlement transactions are required at this stage.
 2. data:
    * [`channel_id`:`channel_id`]
    * [`signature`:`update_signature`]
-   * [`signature`:`settlement_signature`]
 
 #### Requirements
 
@@ -561,7 +546,6 @@ A receiving node:
    * [`channel_id`:`channel_id`]
    * [`u64`:`last_commitment_number`]
    * [`signature`:`update_signature`]
-   * [`signature`:`settlement_signature`]
 
 #### Requirements
 
@@ -575,8 +559,8 @@ A sending node:
     pair of update and settlement transactions the node has sent signatures of to its peer.
   - If it has sent `commitment_signed_eltoo` on the other peer's turn without receiving `yield`:
     - MUST NOT consider that `commitment_signed_eltoo` sent when setting `last_commitment_number`.
-  - MUST set `update_signature` and `settlement_signature` to the corresponding channel state
-    transaction signatures from the `last_commitment_number`.
+  - MUST set `update_signature` to the corresponding channel state
+    update transaction signatures from the `last_commitment_number`.
 
 A receiving node:
 

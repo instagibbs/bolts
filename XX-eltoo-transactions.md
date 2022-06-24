@@ -55,11 +55,11 @@ A `<>` designates an empty vector as required for compliance with [BIP342](https
 
 `sorted_pubkey1, sorted_pubkey2 = KeySort(pubkey1, pubkey2)`
 `aggregated_key = KeyAgg(sorted_pubkey1, sorted_pubkey2)`
-`tr(aggregated_key, EXPR)`
+`tr(aggregated_key, EXPR_UPDATE_0)`
 
 where
 
-`EXPR = 0_sorted_pubkey1 OP_CHECKSIG 0_sorted_pubkey2 OP_CHECKSIGVERIFY`
+`EXPR_UPDATE_0 = 0_sorted_pubkey1 OP_CHECKSIG 0_sorted_pubkey2 OP_CHECKSIGVERIFY`
 
 * As defined by [BIP386](https://github.com/bitcoin/bips/blob/master/bip-0386.mediawiki#tr) and abused by the author.
 
@@ -83,15 +83,35 @@ messages to reduce the required amount of p2p changes and state. These naive upd
    * `txin[0]` witness: `signature_for_sorted_pubkey2 signature_for_sorted_pubkey1`
 * txout count: 1
    * `txout[0]` amount: the HTLC
-   * `txout[0]` script: `tr(aggregated_key, EXPR)`
+   * `txout[0]` script: `tr(aggregated_key, {EXPR_UPDATE(locktime+1), EXPR_SETTLE})`
+* control block: EXPR_UPDATE_0 or EXPR_UPDATE(locktime) merkle proof, depending on what output is being spent
 
-where EXPR =
+where EXPR_UPDATE(n) =
 
-`<locktime+1>` OP_CLTV 0_sorted_pubkey1 OP_CHECKSIG 0_sorted_pubkey2 OP_CHECKSIGVERIFY`
+`<n> OP_CLTV 0_sorted_pubkey1 OP_CHECKSIG 0_sorted_pubkey2 OP_CHECKSIGVERIFY`
+
+and where EXPR_SETTLE =
+
+`<covsig> 0_G OP_CHECKSIG`
+
+where `covsig` is the SIGHASH_ALL|ANYPREVOUT signature of the corresponding settlement transaction, and
+`0_G` the 0-byte prepended BIP340 public key of secp256k1 generator `G`.
 
 and where `signature_for_pubkey1 and `signature_for_pubkey1` use SIGHASH_SINGLE|ANYPREVOUTANYSCRIPT.
 
 Note that the locktime must increase monotonically as it's used as the consensus ratchet for allowing rebinding of updates.
+
+### Rationale
+
+Anyprevout style covenants are used in the update transaction taptree to avoid requiring
+additional communication round-trips for forwarding HTLC messages. If we required a
+standard MuSig2 signature for the settlement transaction, it would be unsafe to hand
+your counterparty both update and settlement signatures in one step, as the counterparty
+could ransom your funds by publishing a completed update transaction, and withhold the
+final settlement signature.
+
+We use the public generator G as a "well known" point, where privkey is the trivial `1`,
+so it can be recreated by any software, even without proper key security.
 
 ## Settlement Transaction
 
@@ -101,7 +121,8 @@ Note that the locktime must increase monotonically as it's used as the consensus
    * `txin[0]` outpoint: `txid` and `output_index` from latest committed state `k` output
    * `txin[0]` sequence: set to `shared_delay`, initially set in channel open negotiation
    * `txin[0]` script bytes: 0
-   * `txin[0]` witness: `signature_for_sorted_pubkey2 signature_for_sorted_pubkey1`
+   * `txin[0]` witness: ``
+* control block: EXPR_SETTLE merkle proof
 
 where `signature_for_sorted_pubkey1 and `signature_for_sorted_pubkey2` use SIGHASH_ALL|ANYPREVOUT.
 
