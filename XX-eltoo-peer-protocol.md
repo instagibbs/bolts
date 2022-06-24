@@ -94,11 +94,8 @@ requiring additional range negotiation in others.
 
 #### Defined Eltoo Channel Types
 
-Eltoo update transactions need no anchor outputs and have
-symmetrical state, which nullifies the requirement for the currently defined `channel_types` for
-ln-penalty-based channels.
-
 The currently defined types are:
+  - FIXME option_scid_alias and option_zeroconf now exist, support them
   - no features (no bits set)
 
 ### The `accept_channel_eltoo` Message
