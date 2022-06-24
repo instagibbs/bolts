@@ -114,7 +114,8 @@ We use the public generator G as a "well known" point, where privkey is the triv
 so it can be recreated by any software, even without proper key security.
 
 The "state-masking offset" is used to hide the total number of updates in the channel from
-blockchain observers.
+blockchain observers. Future versions of this spec can introduce a randomized negotiation
+of this value.
 
 ## Settlement Transaction
 
