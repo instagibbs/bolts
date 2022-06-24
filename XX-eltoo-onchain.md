@@ -191,7 +191,6 @@ A node:
       to claim the latest channel state.
     - Otherwise, MUST respond by publishing the latest update transaction, re-binding
       to the stale update transactions' first output
-    FIXME need to define exactly how many blocks we should be waiting before freaking out
     - if the latest update transaction is then confirmed within X blocks:
       - MUST wait `shared_delay` blocks of confirmation for this transaction
         to publish the corresponding pre-signed *settlement transaction*
