@@ -83,10 +83,10 @@ These transactions contain a single input and output signed with
 SIGHASH_SINGLE, which allows fee inputs and outputs to be added
 by the broadcasting node.
 
-Each subsequent version of this transaction can be "re-bound" to spend
-any prior input that is unresolved on the blockchain.
+Each later update transaction can be "re-bind"ed to spend
+any prior funding or update output that is unresolved on the blockchain.
 
-See [BOLT #??: Update Transaction](??-eltoo-transactions.md#update-transaction)
+See [BOLT #??: Update Transaction](XX-eltoo-transactions.md#update-transaction)
 for more details.
 
 # Settlement Transaction
@@ -103,7 +103,7 @@ As we rely on the publication of update transactions to enforce the final
 state, these outputs have no timelock, aside from the timeout path for the
 HTLC outputs.
 
-See [BOLT #??: Settlement Transaction](??-eltoo-transactions.md#settlement-transaction)
+See [BOLT #??: Settlement Transaction](XX-eltoo-transactions.md#settlement-transaction)
 for more details.
 
 # Failing a Channel
@@ -188,7 +188,7 @@ A node:
       and settlement transaction, weighing it against the value owed to the
       user. In the case of no `to_node` outputs to itself or HLTC outputs, there is no incentive
       to claim the latest channel state.
-    - Otherwise, MUST respond by publishing the latest update transaction, re-bound
+    - Otherwise, MUST respond by publishing the latest update transaction, re-binding
       to the stale update transactions' first output
     FIXME need to define exactly how many blocks we should be waiting before freaking out
     - if the latest update transaction is then confirmed within X blocks:
