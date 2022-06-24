@@ -91,17 +91,19 @@ for more details.
 
 # Settlement Transaction
 
-The local and remote nodes each hold a *settlement transaction*. Each of these
-settlement transactions has up to two types of outputs:
+Each node holds a symmetrical *settlement transaction*. Each of these
+settlement transactions has up to two types of outputs. For each node:
 
 1. A node's main output_: Zero or one output, to pay a peer's
 `settlment_pubkey`.
 1. A node's offered HTLCs_: Zero or more pending payments (*HTLCs*), to pay
-a peer in return for a payment preimage.
+a peer in return for a payment preimage. One node's offered HTLC output is
+the other node's receiving HTLC output.
 
 As we rely on the publication of update transactions to enforce the final
-state, these outputs have no timelock, aside from the timeout path for the
-HTLC outputs.
+state, these outputs are allowed the be spent the very next block, with a
+one block CSV required to avoid pinning by counterparty, with the exception
+of a single 0-value anchor output.
 
 See [BOLT #??: Settlement Transaction](XX-eltoo-transactions.md#settlement-transaction)
 for more details.
@@ -142,7 +144,6 @@ A node:
             - SHOULD use [replace-by-fee](https://github.com/bitcoin/bips/blob/master/bip-0125.mediawiki) or other mechanism on the spending transaction if it proves insufficient for timely inclusion in a block.
           - After `shared_delay` timeout, if the update transaction output isn't otherwise resolved, MUST broadcast the associated *settlement transaction*.
             - MAY attach additional inputs in order to induce inclusion in a block in a timely manner to enforce final state
-              - FIXME This requires ANYPREVOUT to ommit the value in its commitment like ANYPREVOUTANYSCRIPT.
             - MAY spend settlement transaction outputs it controls to use for CPFP
               - FIXME Requires package relay
 
