@@ -113,6 +113,9 @@ final settlement signature.
 We use the public generator G as a "well known" point, where privkey is the trivial `1`,
 so it can be recreated by any software, even without proper key security.
 
+The "state-masking offset" is used to hide the total number of updates in the channel from
+blockchain observers.
+
 ## Settlement Transaction
 
 * version: 2
