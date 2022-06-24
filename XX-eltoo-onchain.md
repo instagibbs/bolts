@@ -18,8 +18,7 @@ blockchain (see [BOLT #??: Channel Close](XX-eltoo-peer-protocol.md#channel-clos
 intent on either side. Perhaps one party crashed, for instance. One side
 publishes latest *latest update transaction*.
 3. The ugly way (*stale unilateral close*): something goes very wrong, peer
-publishes an update transaction that has been replaced with a subsequent transaction
-version.
+publishes an update transaction that has been invalidated by a subsequent update.
 
 The goal of this document is to explain exactly how a node should react when it
 encounters any of the above situations, on-chain.
