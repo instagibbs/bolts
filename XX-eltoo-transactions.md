@@ -83,7 +83,7 @@ messages to reduce the required amount of p2p changes and state. These naive upd
    * `txin[0]` witness: `signature_for_sorted_pubkey2 signature_for_sorted_pubkey1`
 * txout count: 1
    * `txout[0]` amount: the HTLC
-   * `txout[0]` script: `tr(aggregated_key, {EXPR_UPDATE(locktime+1), EXPR_SETTLE(locktime+1})`
+   * `txout[0]` script: `tr(aggregated_key, {EXPR_UPDATE(locktime+1), EXPR_SETTLE(locktime})`
 * control block: EXPR_UPDATE_0 or EXPR_UPDATE(locktime) merkle proof, depending on what output is being spent
 
 where EXPR_UPDATE(n) =
@@ -122,13 +122,13 @@ of this value.
 ## Settlement Transaction
 
 * version: 2
-* locktime: latest update transaction's locktime + 1
+* locktime: corresponding update transaction's locktime
 * txin count: 1
    * `txin[0]` outpoint: `txid` and `output_index` from latest committed state `k` output
    * `txin[0]` sequence: set to `shared_delay`, initially set in channel open negotiation
    * `txin[0]` script bytes: 0
    * `txin[0]` witness: ``
-* control block: EXPR_SETTLE merkle proof
+* control block: EXPR_SETTLE(locktime) merkle proof
 
 where `signature_for_sorted_pubkey1 and `signature_for_sorted_pubkey2` use SIGHASH_ALL|ANYPREVOUT.
 
