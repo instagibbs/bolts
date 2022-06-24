@@ -83,19 +83,20 @@ messages to reduce the required amount of p2p changes and state. These naive upd
    * `txin[0]` witness: `signature_for_sorted_pubkey2 signature_for_sorted_pubkey1`
 * txout count: 1
    * `txout[0]` amount: the HTLC
-   * `txout[0]` script: `tr(aggregated_key, {EXPR_UPDATE(locktime+1), EXPR_SETTLE})`
+   * `txout[0]` script: `tr(aggregated_key, {EXPR_UPDATE(locktime+1), EXPR_SETTLE(locktime+1})`
 * control block: EXPR_UPDATE_0 or EXPR_UPDATE(locktime) merkle proof, depending on what output is being spent
 
 where EXPR_UPDATE(n) =
 
 `<n> OP_CLTV 0_sorted_pubkey1 OP_CHECKSIG 0_sorted_pubkey2 OP_CHECKSIGVERIFY`
 
-and where EXPR_SETTLE =
+and where EXPR_SETTLE(n) =
 
-`<covsig> 0_G OP_CHECKSIG`
+`<covsig> 0_G(n) OP_CHECKSIG`
 
 where `covsig` is the SIGHASH_ALL|ANYPREVOUT signature of the corresponding settlement transaction, and
-`0_G` the 0-byte prepended BIP340 public key of secp256k1 generator `G`.
+`0_G(n)` the 0-byte prepended BIP340 public key of secp256k1 generator `G` multiplied by the scalar `n`,
+i.e. `n*G` in additive notation.
 
 and where `signature_for_pubkey1 and `signature_for_pubkey1` use SIGHASH_SINGLE|ANYPREVOUTANYSCRIPT.
 
@@ -110,8 +111,9 @@ your counterparty both update and settlement signatures in one step, as the coun
 could ransom your funds by publishing a completed update transaction, and withhold the
 final settlement signature.
 
-We use the public generator G as a "well known" point, where privkey is the trivial `1`,
-so it can be recreated by any software, even without proper key security.
+We use the public generator G as a "well known" point, where privkey is the trivial `locktime`,
+so it can be recreated by any software, including watchtowers. This also causes the signature
+to bind specifically to the update it is meant to spend, rather than any update.
 
 The "state-masking offset" is used to hide the total number of updates in the channel from
 blockchain observers. Future versions of this spec can introduce a randomized negotiation
