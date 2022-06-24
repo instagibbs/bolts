@@ -313,7 +313,7 @@ There are only two possible cases for an offered HTLC:
 
 1. The offerer is irrevocably committed to the offered HTLC, but the recipient
    has not yet committed to an outgoing HTLC. In this case, the recipient can
-   either forward or timeout the offered HTLC.
+   either forward or fail the offered HTLC.
 1. The recipient has committed to an outgoing HTLC, in exchange for the offered
    HTLC. In this case, the recipient must use the preimage, once it receives it
    from the outgoing HTLC; otherwise, it will lose funds by sending an outgoing
@@ -325,21 +325,16 @@ is immediately irrevocably committed on sending a `commitment_signed_eltoo`.
 
 ### Requirements
 
-A node:
+A receiving node:
   - if it receives (or already possesses) a payment preimage for an unresolved
   HTLC output that it has been offered AND for which it has committed to an
   outgoing HTLC:
     - MUST *resolve* the output by spending it using the preimage.
     - MUST NOT reveal its own preimage when it's not the final recipient.<sup>[Preimage-Extraction](https://lists.linuxfoundation.org/pipermail/lightning-dev/2020-October/002857.html)</sup>
-  - otherwise:
-
-If the output is spent (as is recommended), the output is *resolved* by
+  - If the output is spent (as is recommended), the output is *resolved* by
 the spending transaction.
-
-If it's NOT otherwise resolved, once the HTLC output has expired, it is
+  - If it's NOT otherwise resolved, once the HTLC output has expired, it is
 considered *irrevocably resolved*.
-
-FIXME make sure I understand these sections wrt asymmetry
 
 # General Requirements
 
