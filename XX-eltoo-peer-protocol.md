@@ -21,8 +21,8 @@ operation, and closing.
       * [`cltv_expiry_delta` Selection](#cltv_expiry_delta-selection)
       * [Adding an HTLC: `update_add_htlc`](#adding-an-htlc-update_add_htlc)
       * [Removing an HTLC: `update_fulfill_htlc`, `update_fail_htlc`, and `update_fail_malformed_htlc`](#removing-an-htlc-update_fulfill_htlc-update_fail_htlc-and-update_fail_malformed_htlc)
-      * [Committing Updates So Far: `commitment_signed`](#committing-updates-so-far-commitment_signed)
-      * [Completing the Transition to the Updated State: `commitment_signed_ack`](#completing-the-transition-to-the-updated-state-commitment_signed_ack)
+      * [Committing Updates So Far: `update_signed`](#committing-updates-so-far-update_signed)
+      * [Completing the Transition to the Updated State: `update_signed_ack`](#completing-the-transition-to-the-updated-state-update_signed_ack)
       * [Updating Fees: `update_fee`](#updating-fees-update_fee)
     * [Message Retransmission: `channel_reestablish` message](#message-retransmission)
   * [Authors](#authors)
@@ -39,8 +39,7 @@ Same as BOLT02 definition
 
 When `option_eltoo` is negotiated, this message contains information about
 a node and indicates its desire to set up a new eltoo channel. This is the first
-step toward creating the funding transaction and both versions of the
-commitment transaction.
+step toward creating the funding transaction and the initial update transaction. 
 
 1. type: 32768 (`open_channel_eltoo`)
 
@@ -179,7 +178,7 @@ Eltoo style channels require two pre-signed transactions for backing out value, 
 ### The `funding_signed_eltoo` Message
 
 This message gives the funder the signature it needs for the first
-commitment transaction, so it can broadcast the transaction knowing that funds
+update transaction, so it can broadcast the transaction knowing that funds
 can be redeemed, if need be. It is sent in response to `funding_created_eltoo`.
 
 This message introduces the `channel_id` to identify the channel. It's derived from the funding transaction by combining the `funding_txid` and the `funding_output_index`, using big-endian exclusive-OR (i.e. `funding_output_index` alters the last 2 bytes).
@@ -372,21 +371,21 @@ with modifications.
         +-------+                                     +-------+
         |       |--(1)---- update_add_htlc ---------->|       |
         |       |--(2)---- update_add_htlc ---------->|       |
-        |       |--(3)--- commitment_signed_eltoo --->|       |
-        |   A   |<--(4)--- commitment_signed_eltoo_ack|   B   |
+        |       |--(3)--- update_signed_eltoo --->|       |
+        |   A   |<--(4)--- update_signed_eltoo_ack|   B   |
         |       |                                     |       |
         |       |<-(5)---- update_add_htlc -----------|       |
-        |       |<-(6)--- commitment_signed_eltoo ----|       |
-        |       |--(7)-- commitment_signed_eltoo_ack->|       |
+        |       |<-(6)--- update_signed_eltoo ----|       |
+        |       |--(7)-- update_signed_eltoo_ack->|       |
         |       |                                     |       |
         +-------+                                     +-------+
 
 The flow is similar except for the symmetrical state. This means there is no
 `revoke_and_ack` message, meaning all updates are immediately applied to the
-pending update and settlement transactions and signed with `commitment_signed_eltoo`.
+pending update and settlement transactions and signed with `update_signed_eltoo`.
 
 Note that once the recipient of an HTLC offer receives a
-`commitment_signed_eltoo` message, the new offers may be forwarded immediately
+`update_signed_eltoo` message, the new offers may be forwarded immediately
 as the update and settlement transactions can be signed locally and broadcasted at any point.
 
 #### Requirements
@@ -395,40 +394,40 @@ Same requirements as `option_simplified_update` except:
 
 A node:
   - At any time:
-    - if it receives a `commitment_signed` or `revoke_and_ack` message
+    - if it receives a `update_signed` or `revoke_and_ack` message
       - SHOULD send an `error` to the sending peer (if connected).
       - MUST fail the channel.
   - During this node's turn:
-    - if it receives an update message or `commitment_signed_eltoo`:
-      - if it has sent its own update or `commitment_signed_eltoo`:
+    - if it receives an update message or `update_signed_eltoo`:
+      - if it has sent its own update or `update_signed_eltoo`:
         - MUST ignore the message
       - otherwise:
         - MUST reply with `yield` and process the message.
   - During the other node's turn:
-    - if it has not received an update message or `commitment_signed_eltoo`:
-      - MAY send one or more update message or `commitment_signed_eltoo`:
-        - MUST NOT include those changes if it receives a later update message or `commitment_signed_eltoo`.
+    - if it has not received an update message or `update_signed_eltoo`:
+      - MAY send one or more update message or `update_signed_eltoo`:
+        - MUST NOT include those changes if it receives a later update message or `update_signed_eltoo`.
         - MUST include those changes if it receives a `yield` in reply.
 
 and channel reestablishment, defined by `channel_reestablish_eltoo`
 
 #### Rationale
 
-Commitment numbers will stay synchronized after the successful end of each turn. On reconnection this allows
+Update numbers will stay synchronized after the successful end of each turn. On reconnection this allows
 a trivial comparison to determine if there was an unfinished turn. Note that this means upgrading of penalty
-channels to eltoo channels is made more difficult if done in the future as we can not assume the commitment
+channels to eltoo channels is made more difficult if done in the future as we can not assume the update
 numbers are synchronized.
 
 ### Forwarding HTLCs
 
 HTLC forwarding logic has been adapted to the symmetrical transaction state
-case of eltoo but uses the same messages as BOLT02 aside from `commitment_signed_eltoo`
-and `commitment_signed_eltoo_ack`:.
+case of eltoo but uses the same messages as BOLT02 aside from `update_signed_eltoo`
+and `update_signed_eltoo_ack`:.
 
 The respective **addition/removal** of an HTLC is considered *irrevocably committed* when:
 
-1. The commitment transaction **with/without** it is committed to by the offering node
-2. The commitment transaction **with/without** it has been irreversibly committed to
+1. The settlement transaction **with/without** it is committed to by the offering node
+2. The settlement transaction **with/without** it has been irreversibly committed to
 the blockchain.
 
 #### Requirements
@@ -466,31 +465,31 @@ Same requirements as BOLT02
 
 ame requirements as BOLT02
 
-### Committing Updates So Far: `commitment_signed_eltoo`
+### Committing Updates So Far: `update_signed_eltoo`
 
-When a node has changes for the shared commitment for an eltoo channel, it can apply them,
+When a node has changes for the shared update for an eltoo channel, it can apply them,
 sign the resulting transaction (as defined in [BOLT #3](03-transactions.md)), and send a
-`commitment_signed_eltoo` message.
+`update_signed_eltoo` message.
 
-Once the recipient of `commitment_signed_eltoo` checks the signatures and knows
-it has a valid new commitment transaction, it replies with its own `commitment_signed_eltoo_ack`
+Once the recipient of `update_signed_eltoo` checks the signatures and knows
+it has a valid new update transaction, it replies with its own `update_signed_eltoo_ack`
 message over the same transactions to ACK the updates and finalize it.
 
-1. type: 32772 (`commitment_signed_eltoo`)
+1. type: 32772 (`update_signed_eltoo`)
 2. data:
    * [`channel_id`:`channel_id`]
    * [`signature`:`update_signature`]
 
-Separating `commitment_signed_eltoo` from `commitment_signed_eltoo_ack` allows for
+Separating `update_signed_eltoo` from `update_signed_eltoo_ack` allows for
 slightly simpler logic and disambiguation of message intent.
 
 #### Requirements
 
 A sending node:
   - during their turn(or when attempting to cause the counter-party to yield):
-    - MUST NOT send a `commitment_signed_eltoo` message that
+    - MUST NOT send a `update_signed_eltoo` message that
       does not include any updates.
-    - MAY send a `commitment_signed_eltoo` message that only
+    - MAY send a `update_signed_eltoo` message that only
       alters the fee.
   - otherwise:
     - MUST NOT include any changes
@@ -501,7 +500,7 @@ A receiving node:
       - if `update_signature` is not valid for update transaction:
         - MUST send a `warning` and close the connection, or send an
           `error` and fail the channel.
-    - MUST respond with a `commitment_signed_eltoo_ack` message of their own.
+    - MUST respond with a `update_signed_eltoo_ack` message of their own.
     - MUST consider the transaction as final
 
 #### Rationale
@@ -509,9 +508,9 @@ A receiving node:
 HTLCs outputs do not require signatures by the offerer, which is why only the two signatures
 for update and settlement transactions are required at this stage.
 
-### Finalizing the update: `commitment_signed_eltoo_ack`
+### Finalizing the update: `update_signed_eltoo_ack`
 
-1. type: 32773 (`commitment_signed_eltoo_ack`)
+1. type: 32773 (`update_signed_eltoo_ack`)
 2. data:
    * [`channel_id`:`channel_id`]
    * [`signature`:`update_signature`]
@@ -544,7 +543,7 @@ A receiving node:
 1. type: 32773 (`channel_reestablish_eltoo`)
 2. data:
    * [`channel_id`:`channel_id`]
-   * [`u64`:`last_commitment_number`]
+   * [`u64`:`last_update_number`]
    * [`signature`:`update_signature`]
 
 #### Requirements
@@ -555,23 +554,23 @@ the extraneous fields removed, and using the `_eltoo`
 based messages respectively.
 
 A sending node:
-  - MUST set `last_commitment_number` to the value of the channel state number of the last
+  - MUST set `last_update_number` to the value of the channel state number of the last
     pair of update and settlement transactions the node has sent signatures of to its peer.
-  - If it has sent `commitment_signed_eltoo` on the other peer's turn without receiving `yield`:
-    - MUST NOT consider that `commitment_signed_eltoo` sent when setting `last_commitment_number`.
+  - If it has sent `update_signed_eltoo` on the other peer's turn without receiving `yield`:
+    - MUST NOT consider that `update_signed_eltoo` sent when setting `last_update_number`.
   - MUST set `update_signature` to the corresponding channel state
-    update transaction signatures from the `last_commitment_number`.
+    update transaction signatures from the `last_update_number`.
 
 A receiving node:
 
 Upon reconnection when `channel_reestablish_eltoo` is exchanged by all channel peers:
-  - If both local and remote `next_commitment_number`s are identical:
+  - If both local and remote `last_update_number`s are identical:
     - signatures from the non-turn-taker can be applied to the turn-taker's
       transaction if not previously received before disconnect
       - If this signature does not validate, MUST fail the channel
     - a new turn then starts with the peer with the lesser
       SEC1-encoded node_id.
-  - If the local and remote node's `last_commitment_number` is exactly one different:
+  - If the local and remote node's `last_update_number` is exactly one different:
       - The turn is aborted. All pending updates are removed, next state number is one greater
         than the largest reported state number, and a new turn starts with the peer with
         the lesser SEC1-encoded node_id.
@@ -588,7 +587,7 @@ communicate to the remote node which state we are on, which should match
 the number they send as well. If they don't match, this indicates an unfinished turn
 or error.
 
-This assumes that HTLCs are not fast-forwarded until after a `commitment_signed_eltoo_ack`
+This assumes that HTLCs are not fast-forwarded until after a `update_signed_eltoo_ack`
 has been sent back to the offerer(and persisted). This allows for more reliable forwarding
 during reconnects without requiring extensive retransmission.
 
