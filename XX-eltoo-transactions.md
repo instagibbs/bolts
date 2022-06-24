@@ -14,6 +14,7 @@ This details the exact format of on-chain transactions, which both sides need to
         * [Settlement Transaction Outputs](#settlement-transaction-outputs)
           * [`to_node` Output](#to_node-output)
           * [HTLC Outputs](#htlc-outputs)
+          * [Ephemeral Anchor Output](#anchor-output)
         * [Trimmed Outputs](#trimmed-outputs)
 	* [Closing Transaction](#closing-transaction)
     * [Fees](#fees)
@@ -54,9 +55,9 @@ Alternative designs not implemented:
 
 1. Don't timelock balance outputs in settlement transactions, and rely on mempool carve-out
 in two-party channel setups to avoid mempool limit pinning. HTLC outputs still need to be locked
-and this does not generalize to N-party. It's nice for funds to go directly to a destination
-wallet of arbitrary type, but limiting in other ways. We instead choose to design a system
-that fairly naively scales to N-party channels.
+and this does not generalize to N-party. The benefits would be that funds can go directly to a destination
+wallet of arbitrary type and also be allowed to directly pay for fees using CPFP. We instead choose to design a system
+that fairly naively scales to N-party channels within the limits of mempool policy development today.
 1. Use SIGHASH_GROUP. This would allow more flexible bring your own fees for settlement
 transactions, as it allows the creation of additional secure change outputs. The motivation
 here is fairly weak, and requires another BIP to be designed, implemented, and accepted
@@ -87,6 +88,8 @@ Most transaction outputs used here are pay-to-taproot<sup>[BIP341](https://githu
 
 A `<>` designates an empty vector as required for compliance with [BIP342](https://github.com/bitcoin/bips/blob/master/bip-0342.mediawiki)
 
+All taproot leaf versions are 0xC0 unless stated otherwise.
+
 ## Funding Transaction Output
 
 * The funding output script is a P2TR to:
@@ -104,8 +107,6 @@ where
 * Where `KeyAgg` and `KeySort` are defined as per BIP-musig2.
 
 * Where `0_*` indicates a 0-byte prepended ANYPREVOUT version of the public key, as per BIP118.
-
-* Leaf version of 0xC0
 
 The key-spend path is used during collaborative channel closes, while for simplicity naive signature aggregation is used for update
 messages to reduce the required amount of p2p changes and state. These naive updates can be converted to MuSig2 on a future version.
@@ -191,11 +192,11 @@ The amounts for each output MUST be rounded down to whole satoshis. If this amou
 
 This output sends funds back to the owner of the satoshi amount. It can be claimed without delay. The output is a P2TR of the form:
 
-`tr(aggregated_key, BALANCE_EXPR})`
+`tr(aggregated_key, BALANCE_EXPR)`
 
 where BALANCE_EXPR =
 
-`1 OP_CHECKSEQUENCEVERIFY settlement_pubkey OP_CHECKSIG`
+    1 OP_CHECKSEQUENCEVERIFY settlement_pubkey OP_CHECKSIGVERIFY
 
 There are `N` copies of this output, one for each channel participant and their associated `settlement_pubkey` sent during channel negotiation.
 
@@ -214,13 +215,11 @@ timeout. Unlike BOLT03, these require no second stage transactions, and can be s
 
 where SUCCESS =
 
-    OP_HASH160 <RIPEMD160(payment_hash)> OP_EQUALVERIFY <recipient_funding_pubkey> OP_CHECKSIG
+    1 OP_CHECKSEQUENCEVERIFY OP_HASH160 <RIPEMD160(payment_hash)> OP_EQUALVERIFY <recipient_funding_pubkey> OP_CHECKSIGVERIFY
 
 and TIMEOUT =
 
-    <timeout sufficient for safety> OP_CLTV <offerer_funding_pubkey> OP_CHECKSIG
-
-* With the leaf version of 0xC0
+    1 OP_CHECKSEQUENCEVERIFY <timeout sufficient for safety> OP_CLTV OP_DROP <offerer_funding_pubkey> OP_CHECKSIGVERIFY
 
 * With the same pubkeys and ordering as the funding transaction output. The key-spend path is currently unused.
 
@@ -233,6 +232,19 @@ And the offerer via:
     <offerer_funding_pubkey_signature>
 
 with the proper nLocktime set
+
+#### Ephemeral Anchor Output
+
+A single shared 0-value anchor output, also known as ephemeral dust, is attached to the settlement
+transaction. This can be spent to create a relay package that can be considered for block inclusion.
+
+This output contains the scriptpubkey of:
+
+`OP_TRUE`
+
+which allows an "empty" spend of the output by anyone, and no known mempool malleabilty vectors.
+
+FIXME Think harder on above. wsh(OP_TRUE) naive is non-malleable, maybe do this instead?
 
 ### Trimmed Outputs
 
@@ -296,16 +308,13 @@ than twice `dust_limit_satoshis`.
 ## Fees
 
 The settlement transaction contains no fees, so implementers must rely
-on CPFP of `to_node` and HTLC outputs for propogation and timely inclusion into the blockchain.
+on CPFP of the single anchor output for propogation and timely inclusion into the blockchain.
+
+Transaction replacement of the CPFP can be a way to increase the feerate of the overall
+package, even if a counterparty is making CPFP transactions.
 
 FIXME add details about how much weight these transactions
 will be with BIP341/342, for CPFP reasons?
-
-FIXME should we CSV delay all HTLC outputs to disallow package limit based pinning? e.g. peer
-spends received HTLC with preimage, makes it huge, then also spends their `to_node` amount
-as well? If they're CSV locked, then settlement txs can only be settled properly if
-user has settled balance already. Maybe an argument for not ommitting your output ala anchors
-or switching to APO with no commitment to input value.
 
 ## Dust Limits
 
@@ -343,6 +352,7 @@ This transaction is relatively trivial to set up.
    [HTLC output](#htlc-outputs).
 1. For every `to_node` output, if it is not trimmed,
    add a [`to_node` output](#to_local-output).
+1. Add a single ephemeral output anchor.
 1. Sort the outputs into [BIP 69+CLTV order](#transaction-output-ordering).
 
 # References
