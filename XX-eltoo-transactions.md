@@ -204,7 +204,7 @@ relay and package CPFP.
 The update transaction:
   - for every `to_node` output:
     - if the amount of any of the settlement transaction `to_node` outputs would be
-less than `dust_limit_satoshis` set by the transaction owner:
+less than `dust_limit_satoshis` set by the channel negotiation:
       - MUST NOT contain that output.
     - otherwise:
       - MUST be generated as specified in [`to_noe` Output](#to_node-output).
