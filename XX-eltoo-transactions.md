@@ -100,16 +100,11 @@ All taproot leaf versions are 0xC0 unless stated otherwise.
 
 where
 
-`EXPR_UPDATE_0 = 0_sorted_pubkey1 OP_CHECKSIG 0_sorted_pubkey2 OP_CHECKSIGVERIFY`
+`EXPR_UPDATE_0 = 1 OP_CHECKSIG`
 
 * As defined by [BIP386](https://github.com/bitcoin/bips/blob/master/bip-0386.mediawiki#tr) and abused by the author.
 
 * Where `KeyAgg` and `KeySort` are defined as per BIP-musig2.
-
-* Where `0_*` indicates a 0-byte prepended ANYPREVOUT version of the public key, as per BIP118.
-
-The key-spend path is used during collaborative channel closes, while for simplicity naive signature aggregation is used for update
-messages to reduce the required amount of p2p changes and state. These naive updates can be converted to MuSig2 on a future version.
 
 ## Update Transaction
 
@@ -119,7 +114,7 @@ messages to reduce the required amount of p2p changes and state. These naive upd
    * `txin[0]` outpoint: `txid` and `output_index` from latest state `k` output (can be 0, the funding output)
    * `txin[0]` sequence: 0xFFFFFFFD, to allow [BIP125](https://github.com/bitcoin/bips/blob/master/bip-0125.mediawiki#summary) replacement
    * `txin[0]` script bytes: 0
-   * `txin[0]` witness: `signature_for_sorted_pubkey2 signature_for_sorted_pubkey1`
+   * `txin[0]` witness: `signature_for_inner_pubkey`
 * txout count: 1
    * `txout[0]` amount: the HTLC
    * `txout[0]` script: `tr(aggregated_key, {EXPR_UPDATE(locktime+1), EXPR_SETTLE(locktime})`
@@ -127,7 +122,7 @@ messages to reduce the required amount of p2p changes and state. These naive upd
 
 where EXPR_UPDATE(n) =
 
-`<n> OP_CLTV 0_sorted_pubkey1 OP_CHECKSIG 0_sorted_pubkey2 OP_CHECKSIGVERIFY`
+`<n> OP_CLTV 1 OP_CHECKSIGVERIFY`
 
 and where EXPR_SETTLE(n) =
 
@@ -137,7 +132,7 @@ where `covsig` is the SIGHASH_ALL|ANYPREVOUT signature of the corresponding sett
 `0_G(n)` the 0-byte prepended BIP340 public key of secp256k1 generator `G` multiplied by the scalar `n`,
 i.e. `n*G` in additive notation.
 
-and where `signature_for_pubkey1 and `signature_for_pubkey1` use SIGHASH_SINGLE|ANYPREVOUTANYSCRIPT.
+and where `signature_for_inner_pubkey uses SIGHASH_SINGLE|ANYPREVOUTANYSCRIPT.
 
 Note that the locktime must increase monotonically as it's used as the consensus ratchet for allowing rebinding of updates.
 
@@ -169,7 +164,7 @@ of this value.
    * `txin[0]` witness: ``
 * control block: EXPR_SETTLE(locktime) merkle proof
 
-where `signature_for_sorted_pubkey1 and `signature_for_sorted_pubkey2` use SIGHASH_ALL|ANYPREVOUT.
+where `signature_for_inner_pubkey uses SIGHASH_ALL|ANYPREVOUT.
 
 Note there may be additional attached transaction inputs due to the ANYPREVOUT signatures which can be used to attach fees during settlement.
 

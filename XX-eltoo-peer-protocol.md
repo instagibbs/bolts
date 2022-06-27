@@ -145,14 +145,15 @@ Symmetrical state means fewer parameters are required compared to `accept_channe
 
 This message describes the outpoint which the funder has created for
 the initial update and settlement transactions. After receiving the peer's
-signature, via `funding_signed`, it will broadcast the funding transaction.
+signature, via `funding_signed_eltoo`, it will broadcast the funding transaction.
 
 1. type: 32770 (`funding_created_eltoo`)
 2. data:
     * [`32*byte`:`temporary_channel_id`]
     * [`sha256`:`funding_txid`]
     * [`u16`:`funding_output_index`]
-    * [`signature`:`update_signature`]
+    * [`partial_sig`:`update_psig`]
+    * [`nonce`:`next_nonce`]
 
 #### Requirements
 
@@ -161,12 +162,18 @@ Requirements are identical to `funding_created` except:
 There is no `signature` field sent, or required.
 
 The sender MUST set:
-  - `update_signature` to the valid signature using its `funding_pubkey` for the initial update transaction, as defined in [BOLT #3](03-transactions.md#update-transaction).
+  - `update_psig` to the valid partial signature using its `funding_pubkey` for the initial update transaction and the previously sent `nonce`s
+    from `open_channel_eltoo` and `accept_channel_eltoo` messages, as defined in [BOLT #3](03-transactions.md#update-transaction).
+  - `next_nonce` to a valid BIP-musig2 nonce to be used for the next channel update during the same connection
 
 The recipient:
-  - if `update_signature` is incorrect:
+  - if `update_psig` is incorrect:
     - MUST send a `warning` and close the connection, or send an
       `error` and fail the channel.
+  - if `next_nonce` is not a valid BIP-musig2 nonce
+    - MUST send a `warning` and close the connection, or send an
+      `error` and fail the channel.
+  - otherwise MUST store and apply `next_nonce` to the next channel update, unless channel reestablishment occurs
 
 #### Rationale
 
@@ -184,7 +191,8 @@ This message introduces the `channel_id` to identify the channel. It's derived f
 1. type: 32771 (`funding_signed_eltoo`)
 2. data:
     * [`channel_id`:`channel_id`]
-    * [`signature`:`update_signature`]
+    * [`partial_sig`:`update_psig`]
+    * [`nonce`:`next_nonce`]
 
 #### Requirements
 
@@ -198,15 +206,21 @@ Both peers:
 
 The sender MUST set:
   - `channel_id` by exclusive-OR of the `funding_txid` and the `funding_output_index` from the `funding_created_eltoo` message.
-  - `update_signature` to the valid signature, using its `update_pubkey` for the initial update transaction, as defined in [BOLT #3](03-transactions.md#update-transaction).
+  - `update_psig` to the valid BIP-musig2 partial signature, using its `update_pubkey` for the initial update transaction, and the previously sent `nonce`s
+    from `open_channel_eltoo` and `accept_channel_eltoo` messages as defined in [BOLT #3](03-transactions.md#update-transaction).
+  - `next_nonce` to a valid BIP-musig2 nonce to be used for the next channel update during the same connection
 
 The recipient:
-  - if `update_signature` is incorrect:
+  - if `update_psig` is incorrect:
     - MUST send a `warning` and close the connection, or send an
       `error` and fail the channel.
   - MUST NOT broadcast the funding transaction before receipt of a valid `funding_signed_eltoo`.
   - on receipt of a valid `funding_signed_eltoo`:
     - SHOULD broadcast the funding transaction.
+  - if `next_nonce` is not a valid BIP-musig2 nonce
+    - MUST send a `warning` and close the connection, or send an
+      `error` and fail the channel.
+  - otherwise MUST store and apply `next_nonce` to the next channel update, unless channel reestablishment occurs
 
 #### Rationale
 
@@ -368,21 +382,21 @@ with modifications.
         +-------+                                     +-------+
         |       |--(1)---- update_add_htlc ---------->|       |
         |       |--(2)---- update_add_htlc ---------->|       |
-        |       |--(3)--- update_signed_eltoo --->|       |
-        |   A   |<--(4)--- update_signed_eltoo_ack|   B   |
+        |       |--(3)--- update_signed --->|       |
+        |   A   |<--(4)--- update_signed_ack|   B   |
         |       |                                     |       |
         |       |<-(5)---- update_add_htlc -----------|       |
-        |       |<-(6)--- update_signed_eltoo ----|       |
-        |       |--(7)-- update_signed_eltoo_ack->|       |
+        |       |<-(6)--- update_signed ----|       |
+        |       |--(7)-- update_signed_ack->|       |
         |       |                                     |       |
         +-------+                                     +-------+
 
 The flow is similar except for the symmetrical state. This means there is no
 `revoke_and_ack` message, meaning all updates are immediately applied to the
-pending update and settlement transactions and signed with `update_signed_eltoo`.
+pending update and settlement transactions and signed with `update_signed`.
 
 Note that once the recipient of an HTLC offer receives a
-`update_signed_eltoo` message, the new offers may be forwarded immediately
+`update_signed` message, the new offers may be forwarded immediately
 as the update and settlement transactions can be signed locally and broadcasted at any point.
 
 #### Requirements
@@ -395,15 +409,15 @@ A node:
       - SHOULD send an `error` to the sending peer (if connected).
       - MUST fail the channel.
   - During this node's turn:
-    - if it receives an update message or `update_signed_eltoo`:
-      - if it has sent its own update or `update_signed_eltoo`:
+    - if it receives an update message or `update_signed`:
+      - if it has sent its own update or `update_signed`:
         - MUST ignore the message
       - otherwise:
         - MUST reply with `yield` and process the message.
   - During the other node's turn:
-    - if it has not received an update message or `update_signed_eltoo`:
-      - MAY send one or more update message or `update_signed_eltoo`:
-        - MUST NOT include those changes if it receives a later update message or `update_signed_eltoo`.
+    - if it has not received an update message or `update_signed`:
+      - MAY send one or more update message or `update_signed`:
+        - MUST NOT include those changes if it receives a later update message or `update_signed`.
         - MUST include those changes if it receives a `yield` in reply.
 
 and channel reestablishment, defined by `channel_reestablish_eltoo`
@@ -418,8 +432,8 @@ numbers are synchronized.
 ### Forwarding HTLCs
 
 HTLC forwarding logic has been adapted to the symmetrical transaction state
-case of eltoo but uses the same messages as BOLT02 aside from `update_signed_eltoo`
-and `update_signed_eltoo_ack`:.
+case of eltoo but uses the same messages as BOLT02 aside from `update_signed`
+and `update_signed_ack`:.
 
 The respective **addition/removal** of an HTLC is considered *irrevocably committed* when:
 
@@ -462,31 +476,32 @@ Same requirements as BOLT02
 
 ame requirements as BOLT02
 
-### Committing Updates So Far: `update_signed_eltoo`
+### Committing Updates So Far: `update_signed`
 
 When a node has changes for the shared update for an eltoo channel, it can apply them,
 sign the resulting transaction (as defined in [BOLT #3](03-transactions.md)), and send a
-`update_signed_eltoo` message.
+`update_signed` message.
 
-Once the recipient of `update_signed_eltoo` checks the signatures and knows
-it has a valid new update transaction, it replies with its own `update_signed_eltoo_ack`
+Once the recipient of `update_signed` checks the signatures and knows
+it has a valid new update transaction, it replies with its own `update_signed_ack`
 message over the same transactions to ACK the updates and finalize it.
 
-1. type: 32772 (`update_signed_eltoo`)
+1. type: 32772 (`update_signed`)
 2. data:
    * [`channel_id`:`channel_id`]
-   * [`signature`:`update_signature`]
+   * [`partial_sig`:`update_psig`]
+   * [`nonce`:`next_nonce`]
 
-Separating `update_signed_eltoo` from `update_signed_eltoo_ack` allows for
+Separating `update_signed` from `update_signed_ack` allows for
 slightly simpler logic and disambiguation of message intent.
 
 #### Requirements
 
 A sending node:
   - during their turn(or when attempting to cause the counter-party to yield):
-    - MUST NOT send a `update_signed_eltoo` message that
+    - MUST NOT send a `update_signed` message that
       does not include any updates.
-    - MAY send a `update_signed_eltoo` message that only
+    - MAY send a `update_signed` message that only
       alters the fee.
   - otherwise:
     - MUST NOT include any changes
@@ -494,35 +509,43 @@ A sending node:
 A receiving node:
   - during another's turn:
     - once all pending updates are applied:
-      - if `update_signature` is not valid for update transaction:
+      - if `update_psig` is not valid for update transaction:
         - MUST send a `warning` and close the connection, or send an
           `error` and fail the channel.
-    - MUST respond with a `update_signed_eltoo_ack` message of their own.
+      - if `next_nonce` is not a valid BIP-musig2 nonce
+        - MUST MUST send a `warning` and close the connection, or send an
+          `error` and fail the channel.
+    - otherwise MUST respond with a `update_signed_ack` message of their own.
     - MUST consider the transaction as final
 
 #### Rationale
 
-HTLCs outputs do not require signatures by the offerer, which is why only the two signatures
-for update and settlement transactions are required at this stage.
+HTLCs outputs do not require signatures by the offerer, which is why only a single signature
+for update transactions is required at this stage.
 
-### Finalizing the update: `update_signed_eltoo_ack`
+### Finalizing the update: `update_signed_ack`
 
-1. type: 32773 (`update_signed_eltoo_ack`)
+1. type: 32773 (`update_signed_ack`)
 2. data:
    * [`channel_id`:`channel_id`]
-   * [`signature`:`update_signature`]
+   * [`partial_sig`:`update_psig`]
+   * [`nonce`:`next_nonce`]
 
 #### Requirements
 
+A sending node:
+  - MUST set `update_psig` to a valid partial signature for the update transaction as defined
+    in [BOLT #3](03-transactions.md).
+  - MUST set `next_nonce` to a valid BIP-musig2 nonce.
+
 A receiving node:
-  - if `update_signature` is not valid for its update transaction:
+  - during another's turn:
+    - if `update_psig` is not valid for update transaction:
       - MUST send a `warning` and close the connection, or send an
         `error` and fail the channel.
-  - if `update_signature` is not valid for its update transaction:
-      - MUST send a `warning` and close the connection, or send an
+    - if `next_nonce` is not a valid BIP-musig2 nonce
+      - MUST MUST send a `warning` and close the connection, or send an
         `error` and fail the channel.
-  - otherwise:
-    - MUST consider the transaction as final
 
 ### Updating Fees: `update_fee`
 
@@ -541,7 +564,8 @@ A receiving node:
 2. data:
    * [`channel_id`:`channel_id`]
    * [`u64`:`last_update_number`]
-   * [`signature`:`update_signature`]
+   * [`partial_sig`:`update_psig`]
+   * [`nonce`:`next_nonce`]
 
 #### Requirements
 
@@ -553,18 +577,18 @@ based messages respectively.
 A sending node:
   - MUST set `last_update_number` to the value of the channel state number of the last
     pair of update and settlement transactions the node has sent signatures of to its peer.
-  - If it has sent `update_signed_eltoo` on the other peer's turn without receiving `yield`:
-    - MUST NOT consider that `update_signed_eltoo` sent when setting `last_update_number`.
-  - MUST set `update_signature` to the corresponding channel state
-    update transaction signatures from the `last_update_number`.
+  - If it has sent `update_signed` on the other peer's turn without receiving `yield`:
+    - MUST NOT consider that `update_signed` sent when setting `last_update_number`.
+  - MUST set `update_psig` to the corresponding channel state local
+    update transaction partial signature from the `last_update_number`.
 
 A receiving node:
 
 Upon reconnection when `channel_reestablish_eltoo` is exchanged by all channel peers:
   - If both local and remote `last_update_number`s are identical:
-    - signatures from the non-turn-taker can be applied to the turn-taker's
+    - partial signature from the non-turn-taker can be applied to the turn-taker's
       transaction if not previously received before disconnect
-      - If this signature does not validate, MUST fail the channel
+      - If this final signature does not validate, MUST fail the channel
     - a new turn then starts with the peer with the lesser
       SEC1-encoded node_id.
   - If the local and remote node's `last_update_number` is exactly one different:
@@ -584,7 +608,7 @@ communicate to the remote node which state we are on, which should match
 the number they send as well. If they don't match, this indicates an unfinished turn
 or error.
 
-This assumes that HTLCs are not fast-forwarded until after a `update_signed_eltoo_ack`
+This assumes that HTLCs are not fast-forwarded until after a `update_signed_ack`
 has been sent back to the offerer(and persisted). This allows for more reliable forwarding
 during reconnects without requiring extensive retransmission.
 
