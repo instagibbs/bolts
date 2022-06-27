@@ -173,7 +173,8 @@ The recipient:
   - if `next_nonce` is not a valid BIP-musig2 nonce
     - MUST send a `warning` and close the connection, or send an
       `error` and fail the channel.
-  - otherwise MUST store and apply `next_nonce` to the next channel update, unless channel reestablishment occurs
+  - otherwise MUST store and apply `next_nonce` to the next channel update,
+      unless channel reestablishment occurs, in which the nonces must be discarded
 
 #### Rationale
 
@@ -220,7 +221,9 @@ The recipient:
   - if `next_nonce` is not a valid BIP-musig2 nonce
     - MUST send a `warning` and close the connection, or send an
       `error` and fail the channel.
-  - otherwise MUST store and apply `next_nonce` to the next channel update, unless channel reestablishment occurs
+  - otherwise MUST store and apply `next_nonce` to the next channel update,
+      unless channel reestablishment occurs, in which the nonces must be discarded
+
 
 #### Rationale
 
@@ -301,7 +304,7 @@ Same for BOLT03 (for now)
 
 The eltoo-variant of `closing_signed` which is sent in the same situation,
 but for eltoo channels. This is a two-round communication due to
-MuSig2 signatures being completed without nonce pre-generation.
+MuSig2 signatures being completed without nonce pre-generation for simplicity.
 
 Fee negotiation is done in an identical manner as `closing_signed`.
 
@@ -573,6 +576,8 @@ Reestablishment of eltoo channels is handled similarly
 to the penalty-based simplified update scheme, with
 the extraneous fields removed, and using the `_eltoo`
 based messages respectively.
+
+All nodes MUST discard any prior `nonce` fields on loss of connection.
 
 A sending node:
   - MUST set `last_update_number` to the value of the channel state number of the last
