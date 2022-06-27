@@ -1,4 +1,4 @@
-# BOLT #2: Peer Protocol for Eltoo Channel Management
+# BOLT #??: Peer Protocol for Eltoo Channel Management
 
 The peer eltoo channel protocol has three phases: establishment, normal
 operation, and closing.
