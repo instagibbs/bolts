@@ -192,9 +192,9 @@ The amounts for each output MUST be rounded down to whole satoshis. If this amou
 
 This output sends funds back to the owner of the satoshi amount. It can be claimed without delay. The output is a P2TR of the form:
 
-`tr(aggregated_key, BALANCE_EXPR)`
+`tr(aggregated_key, EXPR_BALANCE)`
 
-where BALANCE_EXPR =
+where EXPR_BALANCE =
 
     1 OP_CHECKSEQUENCEVERIFY settlement_pubkey OP_CHECKSIGVERIFY
 
