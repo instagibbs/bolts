@@ -117,7 +117,7 @@ where
    * `txin[0]` witness: `signature_for_inner_pubkey`
 * txout count: 1
    * `txout[0]` amount: the HTLC
-   * `txout[0]` script: `tr(aggregated_key, {EXPR_UPDATE(locktime+1), EXPR_SETTLE(locktime})`
+   * `txout[0]` script: `tr(aggregated_key, {EXPR_UPDATE(locktime+1), EXPR_SETTLE(locktime)})`
 * control block: EXPR_UPDATE_0 or EXPR_UPDATE(locktime) merkle proof, depending on what output is being spent
 
 where EXPR_UPDATE(n) =
@@ -126,11 +126,10 @@ where EXPR_UPDATE(n) =
 
 and where EXPR_SETTLE(n) =
 
-`<covsig> 0_G(n) OP_CHECKSIG`
+`CovSig(n) 0_G OP_CHECKSIG`
 
-where `covsig` is the SIGHASH_ALL|ANYPREVOUT signature of the corresponding settlement transaction, and
-`0_G(n)` the 0-byte prepended BIP340 public key of secp256k1 generator `G` multiplied by the scalar `n`,
-i.e. `n*G` in additive notation.
+where `CovSig(n)` is the SIGHASH_ALL|ANYPREVOUT signature of the corresponding settlement transaction with a
+locktime of `n`, and `0_G` the 0-byte prepended BIP340 public key of secp256k1 generator `G`.
 
 and where `signature_for_inner_pubkey uses SIGHASH_SINGLE|ANYPREVOUTANYSCRIPT.
 
@@ -145,9 +144,11 @@ your counterparty both update and settlement signatures in one step, as the coun
 could ransom your funds by publishing a completed update transaction, and withhold the
 final settlement signature.
 
-We use the public generator G as a "well known" point, where privkey is the trivial `locktime`,
-so it can be recreated by any software, including watchtowers. This also causes the signature
-to bind specifically to the update it is meant to spend, rather than any update.
+We use the public generator G as a "well known" point, where privkey is `1`,
+so the signature can be recreated by any software, including watchtowers. The script
+does not need rotation since the signature is committed to directly in the script,
+and the signature directly commits to the settlement transaction, including the nlocktime
+which is unique per update in a given channel.
 
 The "state-masking offset" is used to hide the total number of updates in the channel from
 blockchain observers. Future versions of this spec can introduce a randomized negotiation
@@ -163,8 +164,6 @@ of this value.
    * `txin[0]` script bytes: 0
    * `txin[0]` witness: ``
 * control block: EXPR_SETTLE(locktime) merkle proof
-
-where `signature_for_inner_pubkey uses SIGHASH_ALL|ANYPREVOUT.
 
 Note there may be additional attached transaction inputs due to the ANYPREVOUT signatures which can be used to attach fees during settlement.
 
