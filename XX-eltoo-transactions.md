@@ -128,7 +128,7 @@ and where EXPR_SETTLE(n) =
 
 `CovSig(n) 0_G OP_CHECKSIG`
 
-where `CovSig(n)` is the SIGHASH_ALL|ANYPREVOUT signature of the corresponding settlement transaction with a
+where `CovSig(n)` is the SIGHASH_ALL|ANYPREVOUTANYSCRIPT signature of the corresponding settlement transaction with a
 locktime of `n`, and `0_G` the 0-byte prepended BIP340 public key of secp256k1 generator `G`.
 
 and where `signature_for_inner_pubkey uses SIGHASH_SINGLE|ANYPREVOUTANYSCRIPT.
@@ -165,7 +165,7 @@ of this value.
    * `txin[0]` witness: ``
 * control block: EXPR_SETTLE(locktime) merkle proof
 
-Note there may be additional attached transaction inputs due to the ANYPREVOUT signatures which can be used to attach fees during settlement.
+Note there may be additional attached transaction inputs due to the ANYPREVOUTANYSCRIPT signatures which can be used to attach fees during settlement.
 
 ### Settlement Transaction Outputs
 
