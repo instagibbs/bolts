@@ -165,8 +165,10 @@ of this value.
    * `txin[0]` outpoint: `txid` and `output_index` from latest committed state `k` output
    * `txin[0]` sequence: set to `shared_delay`, initially set in channel open negotiation
    * `txin[0]` script bytes: 0
-   * `txin[0]` witness: ``
-* control block: EXPR_SETTLE(locktime) merkle proof
+   * `txin[0]` witness:
+     * control block: merkle proof
+     * tapscript: EXPR_SETTLE(locktime)
+     * (no additional witness data needed)
 
 Note there may be additional attached transaction inputs due to the ANYPREVOUTANYSCRIPT signatures which can be used to attach fees during settlement.
 
@@ -175,7 +177,7 @@ Note there may be additional attached transaction inputs due to the ANYPREVOUTAN
 Since we are relying on the `shared_delay` timelock to ensure that the final update transaction confirmed on the blockchain
 is indeed the final update in the channel, we do not require revocation paths or additional delays to spend the outputs
 contained in the settlement transaction. We have no second-stage pre-signed transactions, simply outputs that can be
-spent by the authorized parties. For balance outputs, these can be immediently spent by the owners. For HTLC outputs,
+spent by the authorized parties. For balance outputs, these can be immedietly spent by the owners. For HTLC outputs,
 these can be spent immediately once the receiving party obtains the preimage, or can be clawed back by the offerer
 once the CLTV of the output expires.
 
@@ -193,7 +195,7 @@ This output sends funds back to the owner of the satoshi amount. It can be claim
 
 where EXPR_BALANCE =
 
-    1 OP_CHECKSEQUENCEVERIFY settlement_pubkey OP_CHECKSIGVERIFY
+    settlement_pubkey OP_CHECKSIGVERIFY 1 OP_CHECKSEQUENCEVERIFY
 
 There are `N` copies of this output, one for each channel participant and their associated `settlement_pubkey` sent during channel negotiation.
 
@@ -212,11 +214,11 @@ timeout. Unlike BOLT03, these require no second stage transactions, and can be s
 
 where SUCCESS =
 
-    1 OP_CHECKSEQUENCEVERIFY OP_HASH160 <RIPEMD160(payment_hash)> OP_EQUALVERIFY <recipient_funding_pubkey> OP_CHECKSIGVERIFY
+    OP_SIZE 32 EQUALVERIFY OP_HASH160 <RIPEMD160(payment_hash)> OP_EQUALVERIFY <recipient_funding_pubkey> OP_CHECKSIGVERIFY 1 OP_CHECKSEQUENCEVERIFY
 
 and TIMEOUT =
 
-    1 OP_CHECKSEQUENCEVERIFY <timeout sufficient for safety> OP_CLTV OP_DROP <offerer_funding_pubkey> OP_CHECKSIGVERIFY
+    <timeout sufficient for safety> OP_CLTV OP_DROP <offerer_funding_pubkey> OP_CHECKSIGVERIFY 1 OP_CHECKSEQUENCEVERIFY
 
 * With the same pubkeys and ordering as the funding transaction output. The key-spend path is currently unused.
 
@@ -262,7 +264,7 @@ The update transaction:
 less than `dust_limit_satoshis` set by the channel negotiation:
       - MUST NOT contain that output.
     - otherwise:
-      - MUST be generated as specified in [`to_noe` Output](#to_node-output).
+      - MUST be generated as specified in [`to_node` Output](#to_node-output).
   - for every HTLC:
     - if the HTLC amount would be less than
     `dust_limit_satoshis` set by the negotiation:
