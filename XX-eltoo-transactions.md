@@ -92,6 +92,7 @@ All taproot leaf versions are 0xC0 unless stated otherwise.
 
 ## Funding Transaction Output
 
+* The value is the channel capacity.
 * The funding output script is a P2TR to:
 
 `sorted_pubkey1, sorted_pubkey2 = KeySort(pubkey1, pubkey2)`
@@ -114,22 +115,24 @@ where
    * `txin[0]` outpoint: `txid` and `output_index` from latest state `k` output (can be 0, the funding output)
    * `txin[0]` sequence: 0xFFFFFFFD, to allow [BIP125](https://github.com/bitcoin/bips/blob/master/bip-0125.mediawiki#summary) replacement
    * `txin[0]` script bytes: 0
-   * `txin[0]` witness: `signature_for_inner_pubkey`
+   * `txin[0]` witness:
+     * control block: 0xc0 marker for tapscript, internel public key, merkle proof unless spending funding tx
+     * tapscript: EXPR_UPDATE_0 or EXPR_UPDATE(locktime), depending on what output is being spent
+     * `signature_for_inner_pubkey`
 * txout count: 1
-   * `txout[0]` amount: the HTLC
+   * `txout[0]` amount: the channel capacity
    * `txout[0]` script: `tr(aggregated_key, {EXPR_UPDATE(locktime+1), EXPR_SETTLE(locktime)})`
-* control block: EXPR_UPDATE_0 or EXPR_UPDATE(locktime) merkle proof, depending on what output is being spent
 
 where EXPR_UPDATE(n) =
 
-`<n> OP_CLTV 1 OP_CHECKSIGVERIFY`
+`1 OP_CHECKSIGVERIFY <n> OP_CLTV`
 
 and where EXPR_SETTLE(n) =
 
-`CovSig(n) 0_G OP_CHECKSIG`
+`CovSig(n) 1_G OP_CHECKSIG`
 
 where `CovSig(n)` is the SIGHASH_ALL|ANYPREVOUTANYSCRIPT signature of the corresponding settlement transaction with a
-locktime of `n`, and `0_G` the 0-byte prepended BIP340 public key of secp256k1 generator `G`.
+locktime of `n`, and `1_G` the 33-byte BIP118 public key matching the secp256k1 generator `G`.
 
 and where `signature_for_inner_pubkey uses SIGHASH_SINGLE|ANYPREVOUTANYSCRIPT.
 
