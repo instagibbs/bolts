@@ -129,10 +129,10 @@ where EXPR_UPDATE(n) =
 
 and where EXPR_SETTLE(n) =
 
-`CovSig(n) 1_G OP_CHECKSIG`
+`CovSig(n) 1 OP_CHECKSIG`
 
 where `CovSig(n)` is the SIGHASH_ALL|ANYPREVOUTANYSCRIPT signature of the corresponding settlement transaction with a
-locktime of `n`, and `1_G` the 33-byte BIP118 public key matching the secp256k1 generator `G`.
+locktime of `n` signed by `aggregated_key` as per BIP-musig2/BIP-118.
 
 and where `signature_for_inner_pubkey uses SIGHASH_SINGLE|ANYPREVOUTANYSCRIPT.
 
