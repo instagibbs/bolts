@@ -96,8 +96,8 @@ All taproot leaf versions are 0xC0 unless stated otherwise.
 * The funding output script is a P2TR to:
 
 `sorted_pubkey1, sorted_pubkey2 = KeySort(pubkey1, pubkey2)`
-`aggregated_key = KeyAgg(sorted_pubkey1, sorted_pubkey2)`
-`tr(aggregated_key, EXPR_UPDATE_0)`
+`aggregated_key(n) = KeyAgg(sorted_pubkey1, sorted_pubkey2, n*G)`
+`tr(aggregated_key(0), EXPR_UPDATE_0)`
 
 where
 
@@ -121,7 +121,7 @@ where
      * `signature_for_inner_pubkey`
 * txout count: 1
    * `txout[0]` amount: the channel capacity
-   * `txout[0]` script: `tr(aggregated_key, {EXPR_UPDATE(locktime+1), EXPR_SETTLE(locktime)})`
+   * `txout[0]` script: `tr(aggregated_key(k), {EXPR_UPDATE(locktime+1), EXPR_SETTLE(locktime)})`
 
 where EXPR_UPDATE(n) =
 
@@ -129,10 +129,10 @@ where EXPR_UPDATE(n) =
 
 and where EXPR_SETTLE(n) =
 
-`CovSig(n) 1_G OP_CHECKSIG`
+`CovSig(n) 1 OP_CHECKSIG`
 
 where `CovSig(n)` is the SIGHASH_ALL|ANYPREVOUTANYSCRIPT signature of the corresponding settlement transaction with a
-locktime of `n`, and `1_G` the 33-byte BIP118 public key matching the secp256k1 generator `G`.
+locktime of `n` signed by `aggregated_key(k)` as per BIP-musig2/BIP-118.
 
 and where `signature_for_inner_pubkey uses SIGHASH_SINGLE|ANYPREVOUTANYSCRIPT.
 
