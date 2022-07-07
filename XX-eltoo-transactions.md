@@ -95,7 +95,7 @@ All taproot leaf versions are 0xC0 unless stated otherwise.
 * The value is the channel capacity.
 * The funding output script is a P2TR to:
 
-`sorted_pubkey1, sorted_pubkey2 = KeySort(pubkey1, pubkey2)`
+`sorted_pubkey1, sorted_pubkey2 = KeySort(<set of funding_pubkey fields negotiated>)`
 `aggregated_key = KeyAgg(sorted_pubkey1, sorted_pubkey2)`
 `tr(aggregated_key, EXPR_UPDATE_0)`
 
