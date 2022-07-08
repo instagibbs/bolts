@@ -90,6 +90,11 @@ A `<>` designates an empty vector as required for compliance with [BIP342](https
 
 All taproot leaf versions are 0xC0 unless stated otherwise.
 
+## Use of miniscript
+
+[Miniscript](https://bitcoin.sipa.be/miniscript/) is used whenever possible to avoid ambiguity in notation,
+and allow for further analysis.
+
 ## Funding Transaction Output
 
 * The value is the channel capacity.
@@ -101,7 +106,7 @@ All taproot leaf versions are 0xC0 unless stated otherwise.
 
 where
 
-`EXPR_UPDATE_0 = 1 OP_CHECKSIG`
+`EXPR_UPDATE_0 = pk(1)`
 
 * As defined by [BIP386](https://github.com/bitcoin/bips/blob/master/bip-0386.mediawiki#tr) and abused by the author.
 
@@ -125,11 +130,11 @@ where
 
 where EXPR_UPDATE(n) =
 
-`1 OP_CHECKSIGVERIFY <n> OP_CLTV`
+`and_v(v:pk(1),after(n))`
 
 and where EXPR_SETTLE(n) =
 
-`CovSig(n) 1_G OP_CHECKSIG`
+`CovSig(n) ||  pk(1_G)`
 
 where `CovSig(n)` is the SIGHASH_ALL|ANYPREVOUTANYSCRIPT signature of the corresponding settlement transaction with a
 locktime of `n`, and `1_G` the 33-byte BIP118 public key matching the secp256k1 generator `G`.
@@ -194,8 +199,7 @@ This output sends funds back to the owner of the satoshi amount. It can be claim
 `tr(aggregated_key, EXPR_BALANCE)`
 
 where EXPR_BALANCE =
-
-    settlement_pubkey OP_CHECKSIGVERIFY 1 OP_CHECKSEQUENCEVERIFY
+    and_v(v:pk(settlement_pubkey),older(1))
 
 There are `N` copies of this output, one for each channel participant and their associated `settlement_pubkey` sent during channel negotiation.
 
@@ -214,13 +218,17 @@ timeout. Unlike BOLT03, these require no second stage transactions, and can be s
 
 where SUCCESS =
 
-    OP_SIZE 32 EQUALVERIFY OP_HASH160 <RIPEMD160(payment_hash)> OP_EQUALVERIFY <recipient_funding_pubkey> OP_CHECKSIGVERIFY 1 OP_CHECKSEQUENCEVERIFY
+    and(pk(funding_pubkey),and(hash160(H),older(1)))
+
+where `H` is the payment hash and `funding_pubkey` the *recipient* pubkey
 
 and TIMEOUT =
 
-    <timeout sufficient for safety> OP_CLTV OP_DROP <offerer_funding_pubkey> OP_CHECKSIGVERIFY 1 OP_CHECKSEQUENCEVERIFY
+    and_v(v:after(N),and_v(v:pk(funding_pubkey),older(1)))
 
-* With the same pubkeys and ordering as the funding transaction output. The key-spend path is currently unused.
+where `N` is the HTLC expiry blockheight, and `funding_pubkey` is the *offerer's* pubkey.
+
+ The key-spend path is currently unused.
 
 The recipient node can redeem the HTLC with the witness:
 
@@ -230,7 +238,7 @@ And the offerer via:
 
     <offerer_funding_pubkey_signature>
 
-with the proper nLocktime set
+with the proper nLocktime set to include in the next block.
 
 #### Ephemeral Anchor Output
 
