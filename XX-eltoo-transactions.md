@@ -225,7 +225,7 @@ timeout. Unlike BOLT03, these require no second stage transactions, and can be s
 
 where EXPR_SUCCESS =
 
-`<funding_pubkey> OP_CHECKSIGVERIFY OP_SIZE <32-byte preimage> OP_EQUALVERIFY OP_HASH160 <H>
+`<funding_pubkey> OP_CHECKSIGVERIFY OP_SIZE <32> OP_EQUALVERIFY OP_HASH160 <H>
 OP_EQUALVERIFY 1 OP_CHECKSEQUENCEVERIFY`
 
 with a policy of `and(pk(funding_pubkey),and(hash160(H),older(1)))`
