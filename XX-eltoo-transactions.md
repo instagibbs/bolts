@@ -225,21 +225,21 @@ timeout. Unlike BOLT03, these require no second stage transactions, and can be s
 
 where EXPR_SUCCESS =
 
-`<funding_pubkey> OP_CHECKSIGVERIFY OP_SIZE <32> OP_EQUALVERIFY OP_HASH160 <H>
+`<settlement_pubkey> OP_CHECKSIGVERIFY OP_SIZE <32> OP_EQUALVERIFY OP_HASH160 <H>
 OP_EQUALVERIFY 1 OP_CHECKSEQUENCEVERIFY`
 
-with a policy of `and(pk(funding_pubkey),and(hash160(H),older(1)))`
+with a policy of `and(pk(settlment_pubkey),and(hash160(H),older(1)))`
 
-where `H` is the payment hash and `funding_pubkey` the *recipient* pubkey
+where `H` is the payment hash and `settlement_pubkey` the *recipient* pubkey
 
 and EXPR_TIMEOUT =
 
-`<N> OP_CHECKLOCKTIMEVERIFY OP_VERIFY <funding_pubkey> OP_CHECKSIGVERIFY 1
+`<N> OP_CHECKLOCKTIMEVERIFY OP_VERIFY <settlement_pubkey> OP_CHECKSIGVERIFY 1
 OP_CHECKSEQUENCEVERIFY`
 
-with policy of `and(after(N),and(pk(funding_pubkey),older(1)))`
+with policy of `and(after(N),and(pk(settlement_pubkey),older(1)))`
 
-where `N` is the HTLC expiry blockheight, and `funding_pubkey` is the *offerer's* pubkey.
+where `N` is the HTLC expiry blockheight, and `settlement_pubkey` is the *offerer's* pubkey.
 
  The key-spend path is currently unused.
 
@@ -249,9 +249,9 @@ The recipient node can redeem the HTLC with the witness:
 
 And the offerer via:
 
-    <offerer_funding_pubkey_signature>
+    <offerer_settlement_pubkey_signature>
 
-with the proper nLocktime set to include in the next block.
+with the proper nlocktime set to include in the next block.
 
 #### Ephemeral Anchor Output
 
