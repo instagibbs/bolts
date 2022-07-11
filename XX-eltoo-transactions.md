@@ -106,7 +106,9 @@ and allow for further analysis.
 
 where
 
-`EXPR_UPDATE_0 = pk(1)`
+`EXPR_UPDATE_0 = <1> OP_CHECKSIG`
+
+with the policy of `pk(1)`
 
 * As defined by [BIP386](https://github.com/bitcoin/bips/blob/master/bip-0386.mediawiki#tr) and abused by the author.
 
@@ -130,11 +132,13 @@ where
 
 where EXPR_UPDATE(n) =
 
-`and_v(v:pk(1),after(n))`
+`<1> OP_CHECKSIGVERIFY <n> OP_CHECKLOCKTIMEVERIFY`
+
+with the policy of `and(pk(1),after(n))`
 
 and where EXPR_SETTLE(n) =
 
-`CovSig(n) ||  pk(1_G)`
+`<CovSig(n)> <1_G> OP_CHECKSIG`
 
 where `CovSig(n)` is the SIGHASH_ALL|ANYPREVOUTANYSCRIPT signature of the corresponding settlement transaction with a
 locktime of `n`, and `1_G` the 33-byte BIP118 public key matching the secp256k1 generator `G`.
@@ -199,7 +203,10 @@ This output sends funds back to the owner of the satoshi amount. It can be claim
 `tr(aggregated_key, EXPR_BALANCE)`
 
 where EXPR_BALANCE =
-    and_v(v:pk(settlement_pubkey),older(1))
+
+`<settlement_pubkey> OP_CHECKSIGVERIFY 1 OP_CHECKSEQUENCEVERIFY`
+
+with the policy of `and(pk(settlement_pubkey),older(1))`
 
 There are `N` copies of this output, one for each channel participant and their associated `settlement_pubkey` sent during channel negotiation.
 
@@ -214,17 +221,23 @@ timelocked, or we use the carve-out rule in two-party scenarios, but this does n
 The output encumbers funds to the receipient of the HTLC offer with a primage, or back to the offerer upon
 timeout. Unlike BOLT03, these require no second stage transactions, and can be signed at any point.
 
-`tr(aggregated_key, {SUCCESS, TIMEOUT})`
+`tr(aggregated_key, {EXPR_SUCCESS, EXPR_TIMEOUT})`
 
-where SUCCESS =
+where EXPR_SUCCESS =
 
-    and(pk(funding_pubkey),and(hash160(H),older(1)))
+`<funding_pubkey> OP_CHECKSIGVERIFY OP_SIZE <32-byte preimage> OP_EQUALVERIFY OP_HASH160 <H>
+OP_EQUALVERIFY 1 OP_CHECKSEQUENCEVERIFY`
+
+with a policy of `and(pk(funding_pubkey),and(hash160(H),older(1)))`
 
 where `H` is the payment hash and `funding_pubkey` the *recipient* pubkey
 
-and TIMEOUT =
+and EXPR_TIMEOUT =
 
-    and_v(v:after(N),and_v(v:pk(funding_pubkey),older(1)))
+`<N> OP_CHECKLOCKTIMEVERIFY OP_VERIFY <funding_pubkey> OP_CHECKSIGVERIFY 1
+OP_CHECKSEQUENCEVERIFY`
+
+with policy of `and(after(N),and(pk(funding_pubkey),older(1)))`
 
 where `N` is the HTLC expiry blockheight, and `funding_pubkey` is the *offerer's* pubkey.
 
