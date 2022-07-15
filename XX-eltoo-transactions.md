@@ -50,6 +50,7 @@ in short:
     efficient. This is a BIP125 rule#3 work-around.
 1. Ephemeral dust outputs are implemented. This allows dust to be standard if and only if it is spent in a relay
 package by a transaction within that package. This enables 0-value anchor outputs.
+1. Annex data is allowed, up to at least 33 bytes worth for our purposes.
 
 Alternative designs not implemented:
 
@@ -123,6 +124,7 @@ with the policy of `pk(1)`
    * `txin[0]` sequence: 0xFFFFFFFD, to allow [BIP125](https://github.com/bitcoin/bips/blob/master/bip-0125.mediawiki#summary) replacement
    * `txin[0]` script bytes: 0
    * `txin[0]` witness:
+     * annex: 0x50 followed by ''hash<sub>TapLeaf</sub>(v || compact_size(size of EXPR_SETTLE) || EXPR_SETTLE(locktime))''
      * control block: 0xC0 marker for tapscript, internel public key, merkle proof unless spending funding tx
      * tapscript: EXPR_UPDATE_0 or EXPR_UPDATE(locktime), depending on what output is being spent
      * `signature_for_inner_pubkey`
@@ -161,6 +163,14 @@ so the signature can be recreated by any software, including watchtowers. The sc
 does not need rotation since the signature is committed to directly in the script,
 and the signature directly commits to the settlement transaction, including the nlocktime
 which is unique per update in a given channel.
+
+The `annex` is required to allow recovery of the control block to spend an invalidated update
+transaction with the latest update transaction, without requiring particpants to hold all invalidated
+settlement states forever. This is due to the signature that is included in the script, which cannot
+be otherwise deterministically regenerated without access to the full settlement state.
+ Alternatively, we could add another round-trip to HTLC additions and forwards,
+as well as further complicate the protocol. FIXME we may want to devise an OP_RETURN like marking
+that will never be used in a softfork definition.
 
 The "state-masking offset" is used to hide the total number of updates in the channel from
 blockchain observers. Future versions of this spec can introduce a randomized negotiation

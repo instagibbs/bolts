@@ -190,7 +190,8 @@ A node:
       user. In the case of no `to_node` outputs to itself or HLTC outputs, there is no incentive
       to claim the latest channel state.
     - Otherwise, MUST respond by publishing the latest update transaction, re-binding
-      to the stale update transactions' first output
+      to the stale update transactions' first output, recovering the necessary
+      control block information from the stale update transaction's annex field.
     - if the latest update transaction is then confirmed within X blocks:
       - MUST wait `shared_delay` blocks of confirmation for this transaction
         to publish the corresponding pre-signed *settlement transaction*
