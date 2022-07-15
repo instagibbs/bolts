@@ -103,22 +103,30 @@ and allow for further analysis.
 
 `sorted_pubkey1, sorted_pubkey2 = KeySort(<set of funding_pubkey fields negotiated>)`
 `aggregated_key = KeyAgg(sorted_pubkey1, sorted_pubkey2)`
-`tr(aggregated_key, EXPR_UPDATE_0)`
+`tr(aggregated_key, EXPR_UPDATE(n=500000000, o=0, k=0))`
 
-where
+where EXPR_UPDATE(n, o, k) =
 
-`EXPR_UPDATE_0 = <1> OP_CHECKSIG`
+`<1> OP_CHECKSIGVERIFY <n+o+k> OP_CHECKLOCKTIMEVERIFY` if `k > 0`
+with the policy of `and(pk(1),after(n))`
 
+else
+
+`<1> OP_CHECKSIGVERIFY <n+o+k>`, in the case of `k == 0`
 with the policy of `pk(1)`
 
-* As defined by [BIP386](https://github.com/bitcoin/bips/blob/master/bip-0386.mediawiki#tr) and abused by the author.
+* Where `o` equals the state-masking offset(always 0 for now)
+
+* Where `k` equals the channel state version, starting at 0
+
+* Output descriptors as defined by [BIP386](https://github.com/bitcoin/bips/blob/master/bip-0386.mediawiki#tr) and abused by the author.
 
 * Where `KeyAgg` and `KeySort` are defined as per BIP-musig2.
 
 ## Update Transaction
 
 * version: 2
-* locktime: 500000000+o+k, where `o` equals the state-masking offset(always 0 for now) and `k` equals the channel state version
+* locktime: 500000000+o+k, with variables defined as per previous section
 * txin count: 1
    * `txin[0]` outpoint: `txid` and `output_index` from latest state `k` output (can be 0, the funding output)
    * `txin[0]` sequence: 0xFFFFFFFD, to allow [BIP125](https://github.com/bitcoin/bips/blob/master/bip-0125.mediawiki#summary) replacement
@@ -131,12 +139,6 @@ with the policy of `pk(1)`
 * txout count: 1
    * `txout[0]` amount: the channel capacity
    * `txout[0]` script: `tr(aggregated_key, {EXPR_UPDATE(locktime+1), EXPR_SETTLE(locktime)})`
-
-where EXPR_UPDATE(n) =
-
-`<1> OP_CHECKSIGVERIFY <n> OP_CHECKLOCKTIMEVERIFY`
-
-with the policy of `and(pk(1),after(n))`
 
 and where EXPR_SETTLE(n) =
 
