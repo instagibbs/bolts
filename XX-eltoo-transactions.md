@@ -187,12 +187,12 @@ of this value.
 * version: 2
 * locktime: corresponding update transaction's locktime
 * txin count: 1
-   * `txin[0]` outpoint: `txid` and `output_index` from latest committed state `k` output
+   * `txin[0]` outpoint: `txid` and `output_index` from latest committed state `n` output
    * `txin[0]` sequence: set to `shared_delay`, initially set in channel open negotiation
    * `txin[0]` script bytes: 0
    * `txin[0]` witness:
      * control block: merkle proof
-     * tapscript: EXPR_SETTLE(locktime)
+     * tapscript: EXPR_SETTLE(n)
      * (no additional witness data needed)
 
 Note there may be additional attached transaction inputs due to the ANYPREVOUTANYSCRIPT signatures which can be used to attach fees during settlement.
