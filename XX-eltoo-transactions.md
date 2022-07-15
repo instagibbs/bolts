@@ -124,7 +124,7 @@ with the policy of `pk(1)`
    * `txin[0]` sequence: 0xFFFFFFFD, to allow [BIP125](https://github.com/bitcoin/bips/blob/master/bip-0125.mediawiki#summary) replacement
    * `txin[0]` script bytes: 0
    * `txin[0]` witness:
-     * annex: 0x50 followed by ''hash<sub>TapLeaf</sub>(v || compact_size(size of EXPR_SETTLE) || EXPR_SETTLE(locktime))''
+     * annex: 0x50 followed by ''hash<sub>TapLeaf</sub>(v || compact_size(size of EXPR_SETTLE(locktime)) || EXPR_SETTLE(locktime))''
      * control block: 0xC0 marker for tapscript, internel public key, merkle proof unless spending funding tx
      * tapscript: EXPR_UPDATE_0 or EXPR_UPDATE(locktime), depending on what output is being spent
      * `signature_for_inner_pubkey`
