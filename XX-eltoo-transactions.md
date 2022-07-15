@@ -99,25 +99,29 @@ and allow for further analysis.
 ## Funding Transaction Output
 
 * The value is the channel capacity.
+
+TL(n) = `500000000+o+n`
+
+* Where `o` equals the state-masking offset(always 0 for now)
+
+* Where `n` equals the channel state version, starting at 0
+
 * The funding output script is a P2TR to:
 
 `sorted_pubkey1, sorted_pubkey2 = KeySort(<set of funding_pubkey fields negotiated>)`
 `aggregated_key = KeyAgg(sorted_pubkey1, sorted_pubkey2)`
-`tr(aggregated_key, EXPR_UPDATE(n=500000000, o=0, k=0))`
+`tr(aggregated_key, EXPR_UPDATE(0))`
 
-where EXPR_UPDATE(n, o, k) =
 
-`<1> OP_CHECKSIGVERIFY <n+o+k> OP_CHECKLOCKTIMEVERIFY` if `k > 0`
-with the policy of `and(pk(1),after(n))`
+* where EXPR_UPDATE(n) =
+
+`<1> OP_CHECKSIGVERIFY <TL(n)> OP_CHECKLOCKTIMEVERIFY` if `n > 0`
+with the policy of `and(pk(1),after(TL(n)))`
 
 else
 
-`<1> OP_CHECKSIGVERIFY <n+o+k>`, in the case of `k == 0`
+`<1> OP_CHECKSIGVERIFY`, in the case of `n == 0`
 with the policy of `pk(1)`
-
-* Where `o` equals the state-masking offset(always 0 for now)
-
-* Where `k` equals the channel state version, starting at 0
 
 * Output descriptors as defined by [BIP386](https://github.com/bitcoin/bips/blob/master/bip-0386.mediawiki#tr) and abused by the author.
 
@@ -126,26 +130,26 @@ with the policy of `pk(1)`
 ## Update Transaction
 
 * version: 2
-* locktime: 500000000+o+k, with variables defined as per previous section
+* locktime: TL(n)
 * txin count: 1
-   * `txin[0]` outpoint: `txid` and `output_index` from latest state `k` output (can be 0, the funding output)
+   * `txin[0]` outpoint: `txid` and `output_index` from latest state `n` output (can be 0, the funding output)
    * `txin[0]` sequence: 0xFFFFFFFD, to allow [BIP125](https://github.com/bitcoin/bips/blob/master/bip-0125.mediawiki#summary) replacement
    * `txin[0]` script bytes: 0
    * `txin[0]` witness:
-     * annex: 0x50 followed by ''hash<sub>TapLeaf</sub>(v || compact_size(size of EXPR_SETTLE(locktime)) || EXPR_SETTLE(locktime))''
+     * annex: 0x50 followed by ''hash<sub>TapLeaf</sub>(v || compact_size(size of EXPR_SETTLE(n+1)) || EXPR_SETTLE(n+1))''
      * control block: 0xC0 marker for tapscript, internel public key, merkle proof unless spending funding tx
-     * tapscript: EXPR_UPDATE_0 or EXPR_UPDATE(locktime), depending on what output is being spent
+     * tapscript: EXPR_UPDATE(n)
      * `signature_for_inner_pubkey`
 * txout count: 1
    * `txout[0]` amount: the channel capacity
-   * `txout[0]` script: `tr(aggregated_key, {EXPR_UPDATE(locktime+1), EXPR_SETTLE(locktime)})`
+   * `txout[0]` script: `tr(aggregated_key, {EXPR_UPDATE(n+1), EXPR_SETTLE(n)})`
 
 and where EXPR_SETTLE(n) =
 
-`<CovSig(n)> <1_G> OP_CHECKSIG`
+`<CovSig(TL(n))> <1_G> OP_CHECKSIG`
 
-where `CovSig(n)` is the SIGHASH_ALL|ANYPREVOUTANYSCRIPT signature of the corresponding settlement transaction with a
-locktime of `n`, and `1_G` the 33-byte BIP118 public key matching the secp256k1 generator `G`.
+where `CovSig(x)` is the SIGHASH_ALL|ANYPREVOUTANYSCRIPT signature of the corresponding settlement transaction with a
+locktime of `x`, and `1_G` the 33-byte BIP118 public key matching the secp256k1 generator `G`.
 
 and where `signature_for_inner_pubkey uses SIGHASH_SINGLE|ANYPREVOUTANYSCRIPT.
 
