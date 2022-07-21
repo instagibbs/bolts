@@ -120,7 +120,7 @@ with the policy of `and(pk(1),after(TL(n)))`
 
 else
 
-`<1> OP_CHECKSIGVERIFY`, in the case of `n == 0`
+`<1> OP_CHECKSIG`, in the case of `n == 0`
 with the policy of `pk(1)`
 
 * Output descriptors as defined by [BIP386](https://github.com/bitcoin/bips/blob/master/bip-0386.mediawiki#tr) and abused by the author.
