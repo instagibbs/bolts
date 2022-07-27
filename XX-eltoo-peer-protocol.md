@@ -385,12 +385,12 @@ with modifications.
         +-------+                                     +-------+
         |       |--(1)---- update_add_htlc ---------->|       |
         |       |--(2)---- update_add_htlc ---------->|       |
-        |       |--(3)--- update_signed --->|       |
-        |   A   |<--(4)--- update_signed_ack|   B   |
+        |       |--(3)--- update_signed ------------->|       |
+        |   A   |<--(4)--- update_signed_ack ---------|   B   |
         |       |                                     |       |
         |       |<-(5)---- update_add_htlc -----------|       |
-        |       |<-(6)--- update_signed ----|       |
-        |       |--(7)-- update_signed_ack->|       |
+        |       |<-(6)--- update_signed --------------|       |
+        |       |--(7)-- update_signed_ack ========-->|       |
         |       |                                     |       |
         +-------+                                     +-------+
 
