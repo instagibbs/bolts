@@ -130,7 +130,7 @@ with the policy of `pk(1)`
 ## Update Transaction
 
 * version: 2
-* locktime: TL(n), where `n` is the state enumber for this update transaction
+* locktime: TL(n), where `n` is the state number for this update transaction
 * txin count: 1
    * `txin[0]` outpoint: `txid` and `output_index` from last published state `m` output (can be 0, the funding output)
    * `txin[0]` sequence: 0xFFFFFFFD, to allow [BIP125](https://github.com/bitcoin/bips/blob/master/bip-0125.mediawiki#summary) replacement
