@@ -138,7 +138,7 @@ with the policy of `pk(1)`
    * `txin[0]` witness:
      * annex: 0x50 followed by ''hash<sub>TapLeaf</sub>(0xC0 || compact_size(size of EXPR_SETTLE(m)) || EXPR_SETTLE(m))''
      * control block: 0xC0 marker for tapscript, internel public key, merkle proof unless spending funding tx
-     * tapscript: EXPR_UPDATE(m)
+     * tapscript: EXPR_UPDATE(m+1)
      * `signature_for_inner_pubkey`
 * txout count: 1
    * `txout[0]` amount: the channel capacity
