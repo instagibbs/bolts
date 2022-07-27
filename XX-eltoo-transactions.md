@@ -130,15 +130,15 @@ with the policy of `pk(1)`
 ## Update Transaction
 
 * version: 2
-* locktime: TL(n)
+* locktime: TL(n), where `n` is the state enumber for this update transaction
 * txin count: 1
-   * `txin[0]` outpoint: `txid` and `output_index` from latest state `n` output (can be 0, the funding output)
+   * `txin[0]` outpoint: `txid` and `output_index` from last published state `m` output (can be 0, the funding output)
    * `txin[0]` sequence: 0xFFFFFFFD, to allow [BIP125](https://github.com/bitcoin/bips/blob/master/bip-0125.mediawiki#summary) replacement
    * `txin[0]` script bytes: 0
    * `txin[0]` witness:
-     * annex: 0x50 followed by ''hash<sub>TapLeaf</sub>(0xC0 || compact_size(size of EXPR_SETTLE(n)) || EXPR_SETTLE(n))''
+     * annex: 0x50 followed by ''hash<sub>TapLeaf</sub>(0xC0 || compact_size(size of EXPR_SETTLE(m)) || EXPR_SETTLE(m))''
      * control block: 0xC0 marker for tapscript, internel public key, merkle proof unless spending funding tx
-     * tapscript: EXPR_UPDATE(n)
+     * tapscript: EXPR_UPDATE(m)
      * `signature_for_inner_pubkey`
 * txout count: 1
    * `txout[0]` amount: the channel capacity
