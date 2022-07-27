@@ -113,14 +113,14 @@ TL(n) = `500000000+o+n`
 `tr(aggregated_key, EXPR_UPDATE(0))`
 
 
-* where EXPR_UPDATE(n) =
+* where EXPR_UPDATE(x) =
 
-`<1> OP_CHECKSIGVERIFY <TL(n)> OP_CHECKLOCKTIMEVERIFY` if `n > 0`
-with the policy of `and(pk(1),after(TL(n)))`
+`<1> OP_CHECKSIGVERIFY <TL(x)> OP_CHECKLOCKTIMEVERIFY` if `x > 0`
+with the policy of `and(pk(1),after(TL(x)))`
 
 else
 
-`<1> OP_CHECKSIG`, in the case of `n == 0`
+`<1> OP_CHECKSIG`, in the case of `x == 0`
 with the policy of `pk(1)`
 
 * Output descriptors as defined by [BIP386](https://github.com/bitcoin/bips/blob/master/bip-0386.mediawiki#tr) and abused by the author.
