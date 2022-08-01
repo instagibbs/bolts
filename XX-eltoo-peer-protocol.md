@@ -56,7 +56,6 @@ step toward creating the funding transaction and the initial update transaction.
    * [`u16`:`max_accepted_htlcs`]
    * [`point`:`funding_pubkey`]
    * [`point`:`settlement_pubkey`]
-   * [`point`:`htlc_pubkey`]
    * [`byte`:`channel_flags`]
    * [`open_channel_tlvs`:`tlvs`]
 
@@ -78,7 +77,6 @@ Changed fields from `open_channel`:
   - there is no `delayed_payment_basepoint`, as there are no second-stage HTLC transactions to be pre-signed
   - `payment_basepoint` is replaced with a static `settlement_pubkey`
   - no `feerate_per_kw` as there is no up-front negotiated fee for update or settlement transactions
-  - `htlc_basepoint` is replaced by `htlc_pubkey`
   - `first_per_commitment_point` is removed
 
 Sending node:
@@ -117,7 +115,6 @@ transactions.
    * [`u16`:`max_accepted_htlcs`]
    * [`point`:`funding_pubkey`]
    * [`point`:`settlement_pubkey`]
-   * [`point`:`htlc_pubkey`]
    * [`accept_channel_tlvs`:`tlvs`]
 
 1. `tlv_stream`: `accept_channel_tlvs`
