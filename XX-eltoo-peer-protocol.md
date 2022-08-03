@@ -50,7 +50,6 @@ step toward creating the funding transaction and the initial update transaction.
    * [`u64`:`push_msat`]
    * [`u64`:`dust_limit_satoshis`]
    * [`u64`:`max_htlc_value_in_flight_msat`]
-   * [`u64`:`channel_reserve_satoshis`]
    * [`u64`:`htlc_minimum_msat`]
    * [`u16`:`shared_delay`]
    * [`u16`:`max_accepted_htlcs`]
@@ -78,6 +77,7 @@ Changed fields from `open_channel`:
   - `payment_basepoint` is replaced with a static `settlement_pubkey`
   - no `feerate_per_kw` as there is no up-front negotiated fee for update or settlement transactions
   - `first_per_commitment_point` is removed
+  - there is no `channel_reserve_satoshis`
 
 Sending node:
   - SHOULD set `shared_delay` to a reasonable number
@@ -89,6 +89,8 @@ A receiving node:
 
 The symmetrical transaction state among all peers means that we can simplify some aspects while
 requiring additional range negotiation in others.
+
+Reserve requirements are removed as there are no penalty transactions.
 
 #### Defined Eltoo Channel Types
 
@@ -108,7 +110,6 @@ transactions.
    * [`32*byte`:`temporary_channel_id`]
    * [`u64`:`dust_limit_satoshis`]
    * [`u64`:`max_htlc_value_in_flight_msat`]
-   * [`u64`:`channel_reserve_satoshis`]
    * [`u64`:`htlc_minimum_msat`]
    * [`u32`:`minimum_depth`]
    * [`u16`:`shared_delay`]
