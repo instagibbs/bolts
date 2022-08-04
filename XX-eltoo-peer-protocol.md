@@ -56,9 +56,9 @@ step toward creating the funding transaction and the initial update transaction.
    * [`point`:`funding_pubkey`]
    * [`point`:`settlement_pubkey`]
    * [`byte`:`channel_flags`]
-   * [`open_channel_tlvs`:`tlvs`]
+   * [`open_channel_eltoo_tlvs`:`tlvs`]
 
-1. `tlv_stream`: `open_channel_tlvs`
+1. `tlv_stream`: `open_channel_eltoo_tlvs`
 2. types:
     1. type: 0 (`upfront_shutdown_script`)
     2. data:
@@ -116,9 +116,9 @@ transactions.
    * [`u16`:`max_accepted_htlcs`]
    * [`point`:`funding_pubkey`]
    * [`point`:`settlement_pubkey`]
-   * [`accept_channel_tlvs`:`tlvs`]
+   * [`accept_channel_eltoo_tlvs`:`tlvs`]
 
-1. `tlv_stream`: `accept_channel_tlvs`
+1. `tlv_stream`: `accept_channel_eltoo_tlvs`
 2. types:
     1. type: 0 (`upfront_shutdown_script`)
     2. data:
