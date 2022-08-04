@@ -42,7 +42,6 @@ a node and indicates its desire to set up a new eltoo channel. This is the first
 step toward creating the funding transaction and the initial update transaction. 
 
 1. type: 32768 (`open_channel_eltoo`)
-
 2. data:
    * [`chain_hash`:`chain_hash`]
    * [`32*byte`:`temporary_channel_id`]
