@@ -560,7 +560,7 @@ A receiving node:
 
 ## Message Retransmission for eltoo
 
-1. type: 32773 (`channel_reestablish_eltoo`)
+1. type: 32774 (`channel_reestablish_eltoo`)
 2. data:
    * [`channel_id`:`channel_id`]
    * [`u64`:`last_update_number`]
