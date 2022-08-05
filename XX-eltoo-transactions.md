@@ -149,7 +149,7 @@ and where EXPR_SETTLE(n) =
 `<CovSig(TL(n))> <1_G> OP_CHECKSIG`
 
 where `CovSig(x)` is the SIGHASH_ALL|ANYPREVOUTANYSCRIPT signature of the corresponding settlement transaction with a
-locktime of `x`, and `1_G` the 33-byte BIP118 public key matching the secp256k1 generator `G`.
+locktime of `x`, and `1_G` the 33-byte BIP118 public key matching the secp256k1 generator `G`, using RFC6979 for nonce derivation, with no auxiliary entropy sources.
 
 and where `signature_for_inner_pubkey uses SIGHASH_SINGLE|ANYPREVOUTANYSCRIPT.
 
