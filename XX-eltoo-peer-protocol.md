@@ -55,6 +55,7 @@ step toward creating the funding transaction and the initial update transaction.
    * [`point`:`funding_pubkey`]
    * [`point`:`settlement_pubkey`]
    * [`byte`:`channel_flags`]
+   * [`nonce`:`next_nonce`]
    * [`open_channel_eltoo_tlvs`:`tlvs`]
 
 1. `tlv_stream`: `open_channel_eltoo_tlvs`
@@ -77,12 +78,18 @@ Changed fields from `open_channel`:
   - no `feerate_per_kw` as there is no up-front negotiated fee for update or settlement transactions
   - `first_per_commitment_point` is removed
   - there is no `channel_reserve_satoshis`
+  - `next_nonce`
 
 Sending node:
   - SHOULD set `shared_delay` to a reasonable number
 
 A receiving node:
   - MUST either accept the `shared_delay` given by the sender, of fail the channel
+  - if `next_nonce` is not a valid BIP-musig2 nonce
+    - MUST send a `warning` and close the connection, or send an
+      `error` and fail the channel.
+  - otherwise MUST store and apply `next_nonce` to the associated `funding_created` transaction,
+      unless channel reestablishment occurs, in which the nonces must be discarded
 
 #### Rationale
 
@@ -115,6 +122,7 @@ transactions.
    * [`u16`:`max_accepted_htlcs`]
    * [`point`:`funding_pubkey`]
    * [`point`:`settlement_pubkey`]
+   * [`nonce`:`next_nonce`]
    * [`accept_channel_eltoo_tlvs`:`tlvs`]
 
 1. `tlv_stream`: `accept_channel_eltoo_tlvs`
@@ -133,6 +141,13 @@ The same requirements as `accept_channel`, except a few redundant fields removed
 Sending node:
   - MUST set `dust_limit_satoshis` to the same value as set in `open_channel`
   - MUST set `shared_delay` to the same value as set in `open_channel`
+
+  - if `next_nonce` is not a valid BIP-musig2 nonce
+    - MUST send a `warning` and close the connection, or send an
+      `error` and fail the channel.
+  - otherwise MUST store and apply `next_nonce` to the associated `funding_signed` transaction,
+      unless channel reestablishment occurs, in which the nonces must be discarded
+
 
 #### Rationale
 
