@@ -376,10 +376,6 @@ We use MuSig2 multisignature algorithm to close eltoo channels. This allows a he
 operating channel to appear to be a single pubkey output even after being spent,
 reducing fees in the common case.
 
-First round is parties sending each other nonces and completing fee negotiation,
-the second round results in partial signatures being passed to all parties, resulting
-in a valid signature for cooperative closing transaction.
-
 It's critically important that nonces are never re-used, giving the recommendation
 that the nonces be wiped in between sessions.
 
