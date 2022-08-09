@@ -245,7 +245,7 @@ Eltoo style channels require two pre-signed transactions for backing out value, 
 
 This message indicates that the funding transaction has reached the `minimum_depth` asked for in `accept_channel_eltoo`. Once both nodes have sent this, the channel enters normal operating mode.
 
-1. type: 36 (`funding_locked_eltoo`)
+1. type: 96 (`funding_locked_eltoo`)
 2. data:
     * [`channel_id`:`channel_id`]
 
@@ -298,7 +298,7 @@ Closing happens in two stages:
 Either node (or both) can send a `shutdown_eltoo` message to initiate closing,
 along with the `scriptpubkey` it wants to be paid to.
 
-1. type: 38 (`shutdown_eltoo`)
+1. type: 68 (`shutdown_eltoo`)
 2. data:
    * [`channel_id`:`channel_id`]
    * [`u16`:`len`]
@@ -328,7 +328,7 @@ but for eltoo channels.
 
 Fee negotiation is done in an identical manner as `closing_signed`.
 
-1. type: 39 (`closing_signed_eltoo`)
+1. type: 99 (`closing_signed_eltoo`)
 2. data:
    * [`channel_id`:`channel_id`]
    * [`u64`:`fee_satoshis`]
