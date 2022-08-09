@@ -41,7 +41,7 @@ When `option_eltoo` is negotiated, this message contains information about
 a node and indicates its desire to set up a new eltoo channel. This is the first
 step toward creating the funding transaction and the initial update transaction. 
 
-1. type: 32768 (`open_channel_eltoo`)
+1. type: 32778 (`open_channel_eltoo`)
 2. data:
    * [`chain_hash`:`chain_hash`]
    * [`32*byte`:`temporary_channel_id`]
@@ -245,7 +245,7 @@ Eltoo style channels require two pre-signed transactions for backing out value, 
 
 This message indicates that the funding transaction has reached the `minimum_depth` asked for in `accept_channel_eltoo`. Once both nodes have sent this, the channel enters normal operating mode.
 
-1. type: 96 (`funding_locked_eltoo`)
+1. type: 32772 (`funding_locked_eltoo`)
 2. data:
     * [`channel_id`:`channel_id`]
 
@@ -298,7 +298,7 @@ Closing happens in two stages:
 Either node (or both) can send a `shutdown_eltoo` message to initiate closing,
 along with the `scriptpubkey` it wants to be paid to.
 
-1. type: 68 (`shutdown_eltoo`)
+1. type: 32773 (`shutdown_eltoo`)
 2. data:
    * [`channel_id`:`channel_id`]
    * [`u16`:`len`]
@@ -328,7 +328,7 @@ but for eltoo channels.
 
 Fee negotiation is done in an identical manner as `closing_signed`.
 
-1. type: 99 (`closing_signed_eltoo`)
+1. type: 32774 (`closing_signed_eltoo`)
 2. data:
    * [`channel_id`:`channel_id`]
    * [`u64`:`fee_satoshis`]
@@ -491,7 +491,7 @@ Once the recipient of `update_signed` checks the signatures and knows
 it has a valid new update transaction, it replies with its own `update_signed_ack`
 message over the same transactions to ACK the updates and finalize it.
 
-1. type: 32772 (`update_signed`)
+1. type: 32775 (`update_signed`)
 2. data:
    * [`channel_id`:`channel_id`]
    * [`partial_sig`:`update_psig`]
@@ -530,7 +530,7 @@ for update transactions is required at this stage.
 
 ### Finalizing the update: `update_signed_ack`
 
-1. type: 32773 (`update_signed_ack`)
+1. type: 32776 (`update_signed_ack`)
 2. data:
    * [`channel_id`:`channel_id`]
    * [`partial_sig`:`update_psig`]
@@ -565,7 +565,7 @@ A receiving node:
 
 ## Message Retransmission for eltoo
 
-1. type: 32774 (`channel_reestablish_eltoo`)
+1. type: 32777 (`channel_reestablish_eltoo`)
 2. data:
    * [`channel_id`:`channel_id`]
    * [`u64`:`last_update_number`]
