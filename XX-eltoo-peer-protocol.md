@@ -588,6 +588,7 @@ A sending node:
     - MUST NOT consider that `update_signed` sent when setting `last_update_number`.
   - MUST set `update_psig` to the corresponding channel state local
     update transaction partial signature from the `last_update_number`.
+ - MUST set `next_nonce` to the nonce to be used for the next channel update partial signature.
 
 A receiving node:
 
@@ -607,6 +608,9 @@ Upon reconnection when `channel_reestablish_eltoo` is exchanged by all channel p
   - otherwise:
     - ??? FIXME must be something we can do here to be nice to the peer that forgot stuff.
       Ahead node can just convince the peer of latest state and share the entire tx?
+  - If `next_nonce` is not a valid BIP-musig2 nonce
+    - MUST send a `warning` and close the connection, or send an
+      `error` and fail the channel.
 
 #### Rationale
 
