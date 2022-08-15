@@ -568,9 +568,8 @@ A receiving node:
 1. type: 32777 (`channel_reestablish_eltoo`)
 2. data:
    * [`channel_id`:`channel_id`]
-   * [`u64`:`last_completed_update`]
-   * [`signature`:`last_update_sig`]
-   * [`u64`:`last_pending_sent`]
+   * [`u64`:`last_update_number`]
+   * [`partial_sig`:`update_psig`]
    * [`nonce`:`next_nonce`]
 
 #### Requirements
@@ -583,39 +582,31 @@ based messages respectively.
 All nodes MUST discard any prior `nonce` fields on loss of connection.
 
 A sending node:
-  - MUST set `last_pending_sent` to the value of the channel state number of the last
-    partial signature it has sent to its peer.
-  - MUST set `last_completed_update` to the value of the channel state number of the last
-    completed update transaction it has the full signature for.
+  - MUST set `last_update_number` to the value of the channel state number of the last
+    pair of update and settlement transactions the node has sent signatures of to its peer.
   - If it has sent `update_signed` on the other peer's turn without receiving `yield`:
     - MUST NOT consider that `update_signed` sent when setting `last_update_number`.
-  - MUST set `last_update_sig` to the corresponding channel state
-    full BIP340 signature from the `last_completed_update`.
-  - MUST set `next_nonce` to the nonce to be used for the next channel update partial signature.
+  - MUST set `update_psig` to the corresponding channel state local
+    update transaction partial signature from the `last_update_number`.
 
 A receiving node:
 
 Upon reconnection when `channel_reestablish_eltoo` is exchanged by all channel peers:
-  - If both local and remote `last_completed_update`s are identical:
-    - If the `last_pending_sent`s values match `last_completed_update`s values:
-        - a new turn then starts with the peer with the lesser
-        SEC1-encoded node_id.
-    - If a single `last_pending_sent` value is exactly one greater than both `last_completed_update` values:
-      - The round `last_pending_sent` is skipped, all pending updates are removed
-      - a new turn then starts with the peer with the lesser
-        SEC1-encoded node_id.
+  - If both local and remote `last_update_number`s are identical:
+    - partial signature from the non-turn-taker can be applied to the turn-taker's
+      transaction if not previously received before disconnect
+      - If this final signature does not validate, MUST fail the channel
+    - a new turn then starts with the peer with the lesser
+      SEC1-encoded node_id.
   - If the local and remote node's `last_update_number` is exactly one different:
-      - The highest `last_update_sig` is applied to the other nodes' pending channel
-        updates.
-        - If the signature does not validate against the corresponding channel update, MUST fail the channel
-        - Otherwise a new turn then starts with the peer with the lesser
-          SEC1-encoded node_id.
+      - The turn is aborted. All pending updates are removed, next state number is one greater
+        than the largest reported state number, and a new turn starts with the peer with
+        the lesser SEC1-encoded node_id.
+      - Offering nodes MUST be able to handle the aborted turns' update transaction, settlement transaction,
+        and resolved HTLCs on-chain.
   - otherwise:
     - ??? FIXME must be something we can do here to be nice to the peer that forgot stuff.
       Ahead node can just convince the peer of latest state and share the entire tx?
-  - if `next_nonce` is not a valid BIP-musig2 nonce
-    - MUST MUST send a `warning` and close the connection, or send an
-      `error` and fail the channel.
 
 #### Rationale
 
@@ -627,12 +618,6 @@ or error.
 This assumes that HTLCs are not fast-forwarded until after a `update_signed_ack`
 has been sent back to the offerer(and persisted). This allows for more reliable forwarding
 during reconnects without requiring extensive retransmission.
-
-Not unconditionally skipping a round whenever `last_completed_update` valuse are identical
-is an optimization to not lose excessive numbers of rounds on flapping connections.
-
-Full signatures are sent to not rely on additional signing state to be stored across connections
-that a MuSig2 signing process requires.
 
 # Authors
 
