@@ -583,11 +583,11 @@ All nodes MUST discard any prior `nonce` fields on loss of connection.
 
 A sending node:
   - MUST set `last_update_number` to the value of the channel state number of the last
-    pair of update and settlement transactions the node has sent signatures of to its peer.
+    partial signature the node has sent to its peer.
   - If it has sent `update_signed` on the other peer's turn without receiving `yield`:
     - MUST NOT consider that `update_signed` sent when setting `last_update_number`.
-  - MUST set `update_psig` to the corresponding channel state local
-    update transaction partial signature from the `last_update_number`.
+  - MUST set `update_psig` to the `last_update_number` channel state
+    update transaction's partial signature.
  - MUST set `next_nonce` to the nonce to be used for the next channel update partial signature.
 
 A receiving node:
