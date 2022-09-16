@@ -280,8 +280,8 @@ This output contains the scriptpubkey of:
 
 which allows an "empty" spend of the output by anyone, and no known mempool malleabilty vectors.
 
-FIXME Could do `OP_DEPTH OP_NOT`, for one more vbyte to make consensus non-malleable.
-Good for ln-penalty where txids are stable?
+There is no consensus-level fix for malleability with bare scripts that lack a sighash,
+so that is the best we are going to do without committing to an expensive script hash.
 
 ### Trimmed Outputs
 
