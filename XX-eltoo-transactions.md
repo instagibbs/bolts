@@ -280,7 +280,8 @@ This output contains the scriptpubkey of:
 
 which allows an "empty" spend of the output by anyone, and no known mempool malleabilty vectors.
 
-FIXME Think harder on above. wsh(OP_TRUE) naive is non-malleable, maybe do this instead?
+FIXME Could do `OP_DEPTH OP_NOT`, for one more vbyte to make consensus non-malleable.
+Good for ln-penalty where txids are stable?
 
 ### Trimmed Outputs
 
