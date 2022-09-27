@@ -392,7 +392,7 @@ with modifications.
         |       |                                     |       |
         |       |<-(5)---- update_add_htlc -----------|       |
         |       |<-(6)--- update_signed --------------|       |
-        |       |--(7)-- update_signed_ack ========-->|       |
+        |       |--(7)-- update_signed_ack ---------->|       |
         |       |                                     |       |
         +-------+                                     +-------+
 

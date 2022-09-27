@@ -44,12 +44,9 @@ The policy assumptions and implications in short are roughly detailed [here](htt
 in short:
 
 1. Package relay is implemented and deployed, as per [this link](https://github.com/bitcoin/bips/pull/1324)
-1. All transactions cooperatively created are nVersion==3, which opts into a more restrictive pattern of spending
-  - All transactions are RBF replaceable.
-  - Maximum total package size limited to economically realstic sizes to make RBF replacement
-    efficient. This is a BIP125 rule#3 work-around.
-1. Ephemeral dust outputs are implemented. This allows dust to be standard if and only if it is spent in a relay
-package by a transaction within that package. This enables 0-value anchor outputs.
+1. [This policy](https://lists.linuxfoundation.org/pipermail/bitcoin-dev/2022-September/020937.html) is adopted for rule#3 pinning mitigation.
+1. Ephemeral Anchors are implemented. This new output type must be immediately spent in package relay.
+   This output is allowed dust-level values, including zero.
 1. Annex data is allowed, up to at least 33 bytes worth for our purposes.
 
 Alternative designs not implemented:
@@ -129,11 +126,11 @@ with the policy of `pk(1)`
 
 ## Update Transaction
 
-* version: 2
+* version: 3
 * locktime: TL(n), where `n` is the state number for this update transaction
 * txin count: 1
    * `txin[0]` outpoint: `txid` and `output_index` from last published state `m` output (can be 0, the funding output)
-   * `txin[0]` sequence: 0xFFFFFFFD, to allow [BIP125](https://github.com/bitcoin/bips/blob/master/bip-0125.mediawiki#summary) replacement
+   * `txin[0]` sequence: 0xFFFFFFFD
    * `txin[0]` script bytes: 0
    * `txin[0]` witness:
      * annex: 0x50 followed by ''hash<sub>TapLeaf</sub>(0xC0 || compact_size(size of EXPR_SETTLE(m)) || EXPR_SETTLE(m))''
@@ -184,7 +181,7 @@ of this value.
 
 ## Settlement Transaction
 
-* version: 2
+* version: 3
 * locktime: corresponding update transaction's locktime
 * txin count: 1
    * `txin[0]` outpoint: `txid` and `output_index` from latest committed state `n` output
@@ -216,13 +213,7 @@ The amounts for each output MUST be rounded down to whole satoshis. If this amou
 
 This output sends funds back to the owner of the satoshi amount. It can be claimed without delay. The output is a P2TR of the form:
 
-`tr(aggregated_key, EXPR_BALANCE)`
-
-where EXPR_BALANCE =
-
-`<settlement_pubkey> OP_CHECKSIGVERIFY 1 OP_CHECKSEQUENCEVERIFY`
-
-with the policy of `and(pk(settlement_pubkey),older(1))`
+`rawtr(settlement_pubkey)`
 
 There are `N` copies of this output, one for each channel participant and their associated `settlement_pubkey` sent during channel negotiation.
 
@@ -271,14 +262,14 @@ with the proper nlocktime set to include in the next block.
 
 #### Ephemeral Anchor Output
 
-A single shared 0-value anchor output, also known as ephemeral dust, is attached to the settlement
-transaction. This can be spent to create a relay package that can be considered for block inclusion.
+A single shared anchor output, also known as ephemeral dust, is attached to the settlement
+transaction. This MUST be spent in a relay package to be considered for block inclusion.
 
 This output contains the scriptpubkey of:
 
-`OP_TRUE`
+`OP_TRUE`, the output value is the value of all the trimmed output values, summed.
 
-which allows an "empty" spend of the output by anyone, and no known mempool malleabilty vectors.
+This allows an "empty" spend of the output by anyone, and no known mempool malleabilty vectors.
 
 There is no consensus-level fix for malleability with bare scripts that lack a sighash,
 so that is the best we are going to do without committing to an expensive script hash.
@@ -288,7 +279,7 @@ so that is the best we are going to do without committing to an expensive script
 Peers agree on a `dust_limit_satoshis` below which outputs should
 not be produced; these outputs that are not produced are termed "trimmed". A trimmed output is
 considered too small to be worth creating and is instead added
-to the settlement transaction fee.
+to the anchor output.
 
 #### Requirements
 
@@ -315,7 +306,7 @@ less than `dust_limit_satoshis` set by the channel negotiation:
 
 Note that there are two possible variants for each node.
 
-* version: 2
+* version: 3
 * locktime: 0
 * txin count: 1
    * `txin[0]` outpoint: `txid` and `output_index` from `funding_created` message
