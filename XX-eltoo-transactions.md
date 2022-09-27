@@ -48,6 +48,7 @@ in short:
 1. Ephemeral Anchors are implemented. This new output type must be immediately spent in package relay.
    This output is allowed dust-level values, including zero.
 1. Annex data is allowed, up to at least 33 bytes worth for our purposes.
+1. APO spends only allow a single input (to avoid ACP pinning)
 
 Alternative designs not implemented:
 
