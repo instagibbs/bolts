@@ -153,6 +153,8 @@ and where `signature_for_inner_pubkey uses SIGHASH_SINGLE|ANYPREVOUTANYSCRIPT.
 
 Note that the locktime must increase monotonically as it's used as the consensus ratchet for allowing rebinding of updates.
 
+FIXME Use some standardized annex formatting to avoid app/consensus collisions
+
 ### Rationale
 
 Anyprevout style covenants are used in the update transaction taptree to avoid requiring
