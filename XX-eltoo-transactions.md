@@ -154,6 +154,7 @@ and where `signature_for_inner_pubkey uses SIGHASH_SINGLE|ANYPREVOUTANYSCRIPT.
 Note that the locktime must increase monotonically as it's used as the consensus ratchet for allowing rebinding of updates.
 
 FIXME Use some standardized annex formatting to avoid app/consensus collisions
+FIXME Sneak a few annex bytes into nsequence since we aren't using relative timelock?
 
 ### Rationale
 
@@ -220,6 +221,9 @@ This output sends funds back to the owner of the satoshi amount. It can be claim
 
 There are `N` copies of this output, one for each channel participant and their associated `settlement_pubkey` sent during channel negotiation.
 
+FIXME Generalize to arbitrary script ala shutdown? Only have to check input is a valid pubkey, which is nice here.
+Simple/safe seems paramount, since this should "never happen". Maybe just support native segwit outputs?
+
 ##### Rationale
 
 Ideally, we could directly use a `rawtr(settlement_pubkey)` or even a raw script to allow maximal flexibility,
@@ -235,19 +239,18 @@ timeout. Unlike BOLT03, these require no second stage transactions, and can be s
 
 where EXPR_SUCCESS =
 
-`<settlement_pubkey> OP_CHECKSIGVERIFY OP_SIZE <32> OP_EQUALVERIFY OP_HASH160 <H>
-OP_EQUALVERIFY 1 OP_CHECKSEQUENCEVERIFY`
+`<settlement_pubkey> OP_CHECKSIGVERIFY OP_SIZE <20> OP_EQUALVERIFY OP_HASH160 <H>
+OP_EQUAL`
 
-with a policy of `and(pk(settlment_pubkey),and(hash160(H),older(1)))`
+with a policy of `and(pk(settlement_pubkey),hash160(H))`
 
 where `H` is the payment hash and `settlement_pubkey` the *recipient* pubkey
 
 and EXPR_TIMEOUT =
 
-`<N> OP_CHECKLOCKTIMEVERIFY OP_VERIFY <settlement_pubkey> OP_CHECKSIGVERIFY 1
-OP_CHECKSEQUENCEVERIFY`
+`<settlement_pubkey> OP_CHECKSIGVERIFY N OP_CHECKLOCKTIMEVERIFY`
 
-with policy of `and(after(N),and(pk(settlement_pubkey),older(1)))`
+with policy of `and(after(N),pk(settlement_pubkey))`
 
 where `N` is the HTLC expiry blockheight, and `settlement_pubkey` is the *offerer's* pubkey.
 
@@ -265,7 +268,7 @@ with the proper nlocktime set to include in the next block.
 
 #### Ephemeral Anchor Output
 
-A single shared anchor output, also known as ephemeral dust, is attached to the settlement
+A single shared anchor output, also known as ephemeral anchor, is attached to the settlement
 transaction. This MUST be spent in a relay package to be considered for block inclusion.
 
 This output contains the scriptpubkey of:
@@ -282,7 +285,7 @@ so that is the best we are going to do without committing to an expensive script
 Peers agree on a `dust_limit_satoshis` below which outputs should
 not be produced; these outputs that are not produced are termed "trimmed". A trimmed output is
 considered too small to be worth creating and is instead added
-to the anchor output.
+to the anchor output's value to be used as CPFP fees.
 
 #### Requirements
 
