@@ -41,6 +41,8 @@ When `option_eltoo` is negotiated, this message contains information about
 a node and indicates its desire to set up a new eltoo channel. This is the first
 step toward creating the funding transaction and the initial update transaction. 
 
+FIXME: Generate/send htlc pubkeys, since hot/cold policy may be in place
+
 1. type: 32778 (`open_channel_eltoo`)
 2. data:
    * [`chain_hash`:`chain_hash`]
@@ -392,7 +394,7 @@ with modifications.
         |       |                                     |       |
         |       |<-(5)---- update_add_htlc -----------|       |
         |       |<-(6)--- update_signed --------------|       |
-        |       |--(7)-- update_signed_ack ========-->|       |
+        |       |--(7)-- update_signed_ack ---------->|       |
         |       |                                     |       |
         +-------+                                     +-------+
 
