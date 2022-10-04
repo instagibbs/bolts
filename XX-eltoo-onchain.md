@@ -105,6 +105,9 @@ state, these outputs are allowed the be spent the very next block, with a
 one block CSV required to avoid pinning by counterparty, with the exception
 of a single 0-value anchor output.
 
+The one block CSV delay should be added to the node for any `cltv_expiry_delta`
+selection and on-chain expiration timers.
+
 See [BOLT #??: Settlement Transaction](XX-eltoo-transactions.md#settlement-transaction)
 for more details.
 
@@ -127,6 +130,7 @@ other HTLC outputs:
     - if it has received a valid `closing_signed_eltoo` message that includes a
     sufficient fee:
       - SHOULD use this fee to perform a *mutual close*.
+        - if the `closing_transaction` fees reveal as insufficient, MAY use a CPFP output
     - otherwise:
       - if the node knows or assumes its channel state is outdated:
         - SHOULD NOT broadcast its *last update transaction*.
@@ -137,7 +141,8 @@ other HTLC outputs:
           - SHOULD use [replace-by-fee](https://github.com/bitcoin/bips/blob/master/bip-0125.mediawiki) or other mechanism on the anchor spending transaction if it proves insufficient for timely inclusion in a block.
         - After `shared_delay` timeout, if the update transaction output isn't otherwise resolved, MUST broadcast the associated *settlement transaction*.
           - MUST spend the epehemeral anchor that contains the trimmed value in order to induce inclusion in a block in a timely manner to enforce final state
-          - MAY spend other settlement outputs along with ephemeral anchor to include fees
+        - Once the *settlement transaction* is confirmed
+          - MUST spend other settlement outputs along with ephemeral anchor to include fees
 
 ## Rationale
 
@@ -185,16 +190,16 @@ A node:
     - Until latest update transaction is mined or invalidated settlement transaction
       resolves the state output:
       - SHOULD estimate the cost of updating current state output to the latest update transaction
-        and settlement transaction, weighing it against the value owed to the user in the latest.
-        In the degenerate case of no `to_node` outputs to itself or HLTC outputs, there is no incentive
+        and settlement transaction, weighing it against the value claimable on-chain by the user in the latest.
+        In the degenerate case of no `to_node` outputs to itself or HTL C outputs, there is no incentive
         to claim the latest channel state.
       - Otherwise, MUST respond by publishing the latest update transaction, re-binding
         to the invalidated update transactions' state output, recovering the necessary
         control block information from the invalidated update transaction's annex field.
       - If the latest update transaction is failing to be mined within the proper window,
         package RBF replacement with a higher fee ephemeral anchor spend is recommended
-        to avoid old state being successfully used, or timeout fulfilled HTLCs with incoming
-        value.
+        to avoid old state being successfully used, or fulfilled HTLCs with incoming
+        value being successfully timeout
     - If the latest update transaction is then confirmed:
       - MUST wait `shared_delay` blocks of confirmation for this transaction
           to publish the corresponding pre-signed *settlement transaction*
@@ -273,6 +278,10 @@ A node:
 ## Rationale
 
 Only pending HTLCs are at risk, no need to move other outputs unless otherwise required.
+Claiming the HTLCs should be fee-bumped with RBF during the timeout windows, if the original
+fee is insufficient.
+
+fixme: add pinning prevention note if you're aggregating naively the HTLCs.
 
 ## HTLC Output Handling: Offerer
 
@@ -356,9 +365,10 @@ A node:
   - MAY simply monitor the contents of the most-work chain for transactions.
     - Note: on-chain HTLCs should be sufficiently rare that speed need not be
     considered critical.
-  - MAY monitor (valid) broadcast transactions (a.k.a the mempool).
-    - Note: watching for mempool transactions should result in lower latency
-    HTLC redemptions.
+
+Reacting on transactions broadcasted in the local node mempool is unsafe as a
+counterparty could either discover the full-node associated to the LN node or
+locks-up fee-bumping reserves of the LN node.
 
 # Authors
 
