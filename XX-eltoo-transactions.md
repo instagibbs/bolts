@@ -52,15 +52,11 @@ in short:
 
 Alternative designs not implemented:
 
-1. Don't timelock balance outputs in settlement transactions, and rely on mempool carve-out
-in two-party channel setups to avoid mempool limit pinning. HTLC outputs still need to be locked
-and this does not generalize to N-party. The benefits would be that funds can go directly to a destination
-wallet of arbitrary type and also be allowed to directly pay for fees using CPFP. We instead choose to design a system
-that fairly naively scales to N-party channels within the limits of mempool policy development today.
 1. Use SIGHASH_GROUP. This would allow more flexible bring your own fees for settlement
 transactions, as it allows the creation of additional secure change outputs. The motivation
 here is fairly weak, and requires another BIP to be designed, implemented, and accepted
-by the community for limited gain.
+by the community for limited gain. And even if implemented, it may introduce new pinning
+vectors that would need to be solved.
 
 # Transactions
 
@@ -221,14 +217,11 @@ This output sends funds back to the owner of the satoshi amount. It can be claim
 
 There are `N` copies of this output, one for each channel participant and their associated `settlement_pubkey` sent during channel negotiation.
 
-FIXME Generalize to arbitrary script ala shutdown? Only have to check input is a valid pubkey, which is nice here.
-Simple/safe seems paramount, since this should "never happen". Maybe just support native segwit outputs?
-
 ##### Rationale
 
-Ideally, we could directly use a `rawtr(settlement_pubkey)` or even a raw script to allow maximal flexibility,
-but we have mempool package limit considerations to contend with. This means all settlement outputs must be
-timelocked, or we use the carve-out rule in two-party scenarios, but this does not scale to N-party channels.
+Ideally, we could directly use a raw script to allow maximal flexibility, but we do not want to ensure
+that all output scripts given are mempool-standard. We do not need one block relative timelock in scripts
+since we can no longer be pinned by package sizes(bip125 rule#3) or package limits thanks to V3 transactions and ephemeral anchors.
 
 #### HTLC Outputs
 
