@@ -100,6 +100,8 @@ requiring additional range negotiation in others.
 
 Reserve requirements are removed as there are no penalty transactions.
 
+Punishment mechanisms could be reintroduced for 2-party channels with [asymmetric witnesses](https://github.com/LLFourn/witness-asymmetric-channel), at the cost of increased complexity, HTLC replacement in lockstep, and inflexibility to multiparty scenarios.
+
 #### Defined Eltoo Channel Types
 
 The currently defined types are:
@@ -376,7 +378,7 @@ Fee negotiation is followed as required in parallel.
 
 We use MuSig2 multisignature algorithm to close eltoo channels. This allows a healthy
 operating channel to appear to be a single pubkey output even after being spent,
-reducing fees in the common case.
+reducing fees in the common case and increasing the anonymity set.
 
 It's critically important that nonces are never re-used, giving the recommendation
 that the nonces be wiped in between sessions.
@@ -405,6 +407,9 @@ pending update and settlement transactions and signed with `update_signed`.
 Note that once the recipient of an HTLC offer receives a
 `update_signed` message, the new offers may be forwarded immediately
 as the update and settlement transactions can be signed locally and broadcasted at any point.
+
+The recipient would be able to take this latest state on-chain if necessary,
+even if older state is broadcast.
 
 #### Requirements
 
@@ -466,6 +471,21 @@ to that outgoing HTLC.
 #### Rationale
 
 Same rationale as BOLT02 except we do not have HTLC-X second stage transactions
+
+### `shared_delay` Selection
+
+The `shared_delay` should be picked up to allow a node to confirm a higher
+state *update transaction* spending a currently confirmed lower state *update transaction*.
+Delay should be lengthy enough to give enough margin to the node to react to
+sudden network mempools congestion spikes. Historically, the default reaction
+delays of LN node implementations have been as low as 6 and as high as 144 blocks.
+
+With eltoo channels, the `shared_delay` must be included in the `cltv_expiry_delta`
+selection, and therefore should be considered as an offset in the worst-case of
+on-chain timeout or fulfillement of HTLC outputs. While it offers more reaction
+block time and increase the channel funds safety, higher `cltv_expiry_delta` are
+penalized by Lightning scoring algorithms. As such for a routing node operator,
+there is a trade-off between safety and routing forwarding competitiveness.
 
 ### `cltv_expiry_delta` Selection
 
