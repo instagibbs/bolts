@@ -46,10 +46,12 @@ This details the exact format of on-chain transactions, which both sides need to
 
 ## Transaction Output Ordering
 
-Outputs in transactions are always sorted according to:
+Outputs in commitment transactions are always sorted according to:
  * first according to their value (in whole satoshis, note that for HTLC outputs, the millisatoshi part must be ignored)
  * followed by `scriptpubkey`, comparing the common-length prefix lexicographically as if by `memcmp`, then selecting the shorter script (if they differ in length),
  * finally, for HTLC outputs, in increasing `cltv_expiry` order.
+
+Note this is rule cannot be enforced for non-collaborative transactions or second-stage transactions that require SIGHASH_SINGLE signatures.
 
 ## Rationale
 
@@ -94,7 +96,7 @@ commitment transaction.
 
 ### Commitment Transaction Outputs
 
-To allow an opportunity for penalty transactions, in case of a revoked commitment transaction, all outputs that return funds to the owner of the commitment transaction (a.k.a. the "local node") must be delayed for `to_self_delay` blocks. This delay is done in a second-stage HTLC transaction (HTLC-success for HTLCs accepted by the local node, HTLC-timeout for HTLCs offered by the local node).
+To allow an opportunity for penalty transactions, in case of a revoked commitment transaction, all outputs that return funds to the owner of the commitment transaction (a.k.a. the "local node") must be delayed for `to_self_delay` blocks. For HTLCs this delay is done in a second-stage HTLC transaction (HTLC-success for HTLCs accepted by the local node, HTLC-timeout for HTLCs offered by the local node).
 
 The reason for the separate transaction stage for HTLC outputs is so that HTLCs can timeout or be fulfilled even though they are within the `to_self_delay` delay.
 Otherwise, the required minimum timeout on HTLCs is lengthened by this delay, causing longer timeouts for HTLCs traversing the network.
@@ -620,7 +622,7 @@ also subtract two times the fixed anchor size of 330 sats from the funder
 8. If `option_anchors` applies to the commitment transaction:
    * if `to_local` exists or there are untrimmed HTLCs, add a [`to_local_anchor` output](#to_local_anchor-and-to_remote_anchor-output-option_anchor_outputs)
    * if `to_remote` exists or there are untrimmed HTLCs, add a [`to_remote_anchor` output](#to_local_anchor-and-to_remote_anchor-output-option_anchor_outputs)
-9. Sort the outputs into [BIP 69+CLTV order](#transaction-input-and-output-ordering).
+9. Sort the outputs into [BIP 69+CLTV order](#transaction-output-ordering).
 
 # Keys
 
