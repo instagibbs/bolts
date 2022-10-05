@@ -98,7 +98,9 @@ A receiving node:
 The symmetrical transaction state among all peers means that we can simplify some aspects while
 requiring additional range negotiation in others.
 
-Reserve requirements are removed as there are no penalty transactions.
+Reserve requirements are removed as there are no penalty transactions. Ulterior mechanisms
+extension could re-enable punishment in the future by leveraging [asymmetric witnesses](https://github.com/LLFourn/witness-asymmetric-channel)
+between all peers.
 
 #### Defined Eltoo Channel Types
 
@@ -378,6 +380,9 @@ We use MuSig2 multisignature algorithm to close eltoo channels. This allows a he
 operating channel to appear to be a single pubkey output even after being spent,
 reducing fees in the common case.
 
+A mutual closing should mask the usage of Lightning attached to the funding output
+from transactions log observers.
+
 It's critically important that nonces are never re-used, giving the recommendation
 that the nonces be wiped in between sessions.
 
@@ -405,6 +410,9 @@ pending update and settlement transactions and signed with `update_signed`.
 Note that once the recipient of an HTLC offer receives a
 `update_signed` message, the new offers may be forwarded immediately
 as the update and settlement transactions can be signed locally and broadcasted at any point.
+Even if the counterparty has not received `update_signed_ack` in return, in case
+of the previous update tranaction being broadcast, the `update_signed` recipient is
+able to over-spend with the adequate state.
 
 #### Requirements
 
@@ -467,9 +475,25 @@ to that outgoing HTLC.
 
 Same rationale as BOLT02 except we do not have HTLC-X second stage transactions
 
+### `shared_delay` Selection
+
+The `shared_delay` should be picked up to allow a node to confirm a higher
+state *update transaction* spending a currently confirmed lower state *update transaction*.
+Delay should be lengthy enough to give enough margin to the node to react to
+sudden network mempools congestion spikes. Historically, the default reaction
+delays of LN node implementations have been as low as 6 and as high as 144 blocks.
+
+With eltoo channels, the `shared_delay` must be included in the `cltv_expiry_delta`
+selection, and therefore should be considered as an offset in the worst-case of
+on-chain timeout or fulfillement of HTLC outputs. While it offers more reaction
+block time and increase the channel funds safety, higher `cltv_expiry_delta` are
+penalized by Lightning scoring algorithms. As such for a routing node operator,
+there is a trade-off between safety and routing forwarding competitiveness.
+
 ### `cltv_expiry_delta` Selection
 
 FIXME eltoo reasoning
+
 
 #### Requirements
 
