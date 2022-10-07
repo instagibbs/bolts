@@ -298,12 +298,12 @@ An offering node:
     - MUST extract the payment preimage from the transaction input witness.
   - if the settlement transaction HTLC output has *timed out* and hasn't been
   *resolved*:
-    - MUST *resolve* the output by spending it using their own `htlc_pubkey` to
+    - MUST *resolve* the output by spending it using their own `settlement_pubkey` to
       any address deemed necessary.
     - once the resolving transaction has reached reasonable depth:
       - MUST fail the corresponding incoming HTLC (if any).
   - for any committed HTLC that has been trimmed:
-    - once the settlement transaction has reached reasonable depth:
+    - once the update transaction that spent the funding output has reached reasonable depth:
       - MUST fail the corresponding incoming HTLC (if any).
     - if no *valid* commitment transaction contains an output corresponding to
     the HTLC.
