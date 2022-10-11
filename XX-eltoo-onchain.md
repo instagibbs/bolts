@@ -303,7 +303,7 @@ An offering node:
     - once the resolving transaction has reached reasonable depth:
       - MUST fail the corresponding incoming HTLC (if any).
   - for any committed HTLC that has been trimmed:
-    - once the update transaction that spent the funding output has reached reasonable depth:
+    - once the update transaction that spent the funding output has reached reasonable depth(FIXME or just been spent? fast fail everyhting?):
       - MUST fail the corresponding incoming HTLC (if any).
     - if no *valid* commitment transaction contains an output corresponding to
     the HTLC.

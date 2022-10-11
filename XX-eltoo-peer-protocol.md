@@ -100,8 +100,6 @@ requiring additional range negotiation in others.
 
 Reserve requirements are removed as there are no penalty transactions.
 
-Punishment mechanisms could be reintroduced for 2-party channels with [asymmetric witnesses](https://github.com/LLFourn/witness-asymmetric-channel), at the cost of increased complexity, HTLC replacement in lockstep, and inflexibility to multiparty scenarios.
-
 #### Defined Eltoo Channel Types
 
 The currently defined types are:
