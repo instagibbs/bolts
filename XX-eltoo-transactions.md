@@ -255,7 +255,7 @@ where `N` is the HTLC expiry blockheight, and `settlement_pubkey` is the *offere
 
 The recipient node can redeem the HTLC with the witness:
 
-    <recipient_settlemet_pubkey_signature> <payment_preimage>
+    <recipient_settlement_pubkey_signature> <payment_preimage>
 
 And the offerer via:
 
