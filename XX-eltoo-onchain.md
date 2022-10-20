@@ -16,7 +16,8 @@ settlement transaction, but without any pending payments) and publish it on the
 blockchain (see [BOLT #??: Channel Close](XX-eltoo-peer-protocol.md#channel-close)).
 2. The bad way (*unilateral close*): something goes wrong, possibly without evil
 intent on either side. Perhaps one party crashed, for instance. One side
-publishes latest *latest update transaction*.
+publishes latest *latest update transaction*. Note that the updating peer
+may not have received an ACK with partial signatures for this update.
 3. The ugly way (*inavalidated unilateral close*): something goes very wrong, peer
 publishes an update transaction that has been invalidated by a subsequent update.
 
@@ -175,8 +176,8 @@ is what allows honest peers to ensure the final state is claimed.
 
 "Rebinding" is the act of taking a pre-signed ANYPREVOUT(ANYSCRIPT) transaction,
 and finalizing all the witness data, as well as modifying the prevout itself,
-to spend the current unresolved utxo in the utxo set. In the case of Eltoo,
-this is the funding output, or any subsequent update transaction output.
+to spend the current unresolved state utxo. In the case of Eltoo,
+this is the funding output, or any subsequent update transaction state output.
 Both update and settlement transactions should be re-bound at broadcast time
 to react to on-chain events properly.
 
