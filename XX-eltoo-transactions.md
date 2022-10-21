@@ -59,8 +59,7 @@ by the community for limited gain. And even if implemented, it may introduce new
 vectors that would need to be solved.
 1. One-shot asymmetric channel constructions, such as [Inherited IDs](https://github.com/JohnLaw2/btc-iids/blob/main/iids14.pdf) and with [NOINPUT/BIP118](https://lists.linuxfoundation.org/pipermail/lightning-dev/2018-July/001363.html)
 which may require deeper changes to the Bitcoin protocol, and may not resolve in HTLC forwards of 0.5 RTT, and seem to be incompatible with watchtowers.
-1. Punishment mechanisms could be reintroduced for 2-party channels with [asymmetric witnesses](https://github.com/LLFourn/witness-asymmetric-channel), at the cost of increased complexity, HTLC replacement in lockstep, and inflexibility to multiparty scenarios.
-1. One-shot asymmetric channel constructions .
+1. Punishment mechanisms could be reintroduced for 2-party channels with [asymmetric witnesses](https://github.com/LLFourn/witness-asymmetric-channel), at the cost of increased complexity, HTLC replacement in lockstep, and inflexibility to multiparty scenarios. [This paper](https://eprint.iacr.org/2022/1295.pdf) as well, which seems simplest.
 
 
 # Transactions
