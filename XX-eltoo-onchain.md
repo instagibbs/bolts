@@ -232,16 +232,15 @@ as necessary.
 
 # Unilateral Close Handling: Invalidated Settlement Transaction
 
-In the case of a inavalidated update maturing and the settlement transaction
+In the case of a invalidated update maturing and the settlement transaction
 confirmed on the blockchain, the node must simply accept whatever
-outputs it is given, even though this is an exception case. Depending
-on level of inavalidatedness and channel state, a significant fraction of funds
-may be recovered this way.
+outputs it is given, even though this is an exception case. A
+significant fraction of funds may be recovered this way.
 
 ## Requirements
 
 A node:
-  - upon discovering a *inavalidated settlement transaction*:
+  - upon discovering a *invalidated settlement transaction*:
     - MAY attempt to sweep any redeemable HTLC outputs
       - HTLC (pre)images may have been forgotten by the client to decrease
         client state to constant size
