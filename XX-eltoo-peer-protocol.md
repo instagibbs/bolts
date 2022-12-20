@@ -383,7 +383,7 @@ that the nonces be wiped in between sessions.
 
 ### Eltoo Simplified Operation
 
-If `open_channel_eltoo` was used to initiate the channel, `option_simplified_update` rules are implied,
+If `open_channel_eltoo` was used to initiate the channel, `option_simplified_update` rules are applied,
 with modifications.
 
         +-------+                                     +-------+
@@ -404,7 +404,7 @@ pending update and settlement transactions and signed with `update_signed`.
 
 Note that once the recipient of an HTLC offer receives a
 `update_signed` message, the new offers may be forwarded immediately
-as the update and settlement transactions can be signed locally and broadcasted at any point.
+as the update and settlement transactions can be finalized locally and broadcasted at any point.
 
 The recipient would be able to take this latest state on-chain if necessary,
 even if older state is broadcast.
@@ -415,7 +415,7 @@ Same requirements as `option_simplified_update` except:
 
 A node:
   - At any time:
-    - if it receives a `update_signed` or `revoke_and_ack` message
+    - if it receives a `commitment_signed` or `revoke_and_ack` message
       - SHOULD send an `error` to the sending peer (if connected).
       - MUST fail the channel.
   - During this node's turn:
@@ -427,7 +427,8 @@ A node:
   - During the other node's turn:
     - if it has not received an update message or `update_signed`:
       - MAY send one or more update message or `update_signed`:
-        - MUST NOT include those changes if it receives a later update message or `update_signed`.
+        - MUST NOT include those changes if it receives a later update message or `update_signed`
+          during this turn.
         - MUST include those changes if it receives a `yield` in reply.
 
 and channel reestablishment, defined by `channel_reestablish_eltoo`
