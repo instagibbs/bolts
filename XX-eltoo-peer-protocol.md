@@ -411,24 +411,27 @@ even if older state is broadcast.
 
 #### Requirements
 
-Same requirements as `option_simplified_update` except:
-
 A node:
-  - At any time:
-    - if it receives a `commitment_signed` or `revoke_and_ack` message
-      - SHOULD send an `error` to the sending peer (if connected).
-      - MUST fail the channel.
+  - MUST NOT send `yield` unless `option_simplified_update` is negotiated.
+  - MUST track whose turn it is, starting with the peer with the lesser SEC1-encoded node_id.
+  - MUST give up its turn when:
+    - sending `update_signed`
+    - sending a `yield`
+  - MUST accept its turn when:
+    - receiving `update_signed`
+    - receiving a `yield`
   - During this node's turn:
     - if it receives an update message or `update_signed`:
       - if it has sent its own update or `update_signed`:
         - MUST ignore the message
       - otherwise:
         - MUST reply with `yield` and process the message.
+    - if it received `update_noop`:
+      - MUST otherwise ignore the message
   - During the other node's turn:
     - if it has not received an update message or `update_signed`:
       - MAY send one or more update message or `update_signed`:
-        - MUST NOT include those changes if it receives a later update message or `update_signed`
-          during this turn.
+        - MUST NOT include those changes if it receives an update message or `update_signed` in reply.
         - MUST include those changes if it receives a `yield` in reply.
 
 and channel reestablishment, defined by `channel_reestablish_eltoo`
