@@ -24,7 +24,7 @@ operation, and closing.
       * [Committing Updates So Far: `update_signed`](#committing-updates-so-far-update_signed)
       * [Completing the Transition to the Updated State: `update_signed_ack`](#completing-the-transition-to-the-updated-state-update_signed_ack)
       * [Updating Fees: `update_fee`](#updating-fees-update_fee)
-    * [Message Retransmission: `channel_reestablish` message](#message-retransmission)
+    * [Message Retransmission: `channel_reestablish_eltoo` message](#message-retransmission)
   * [Authors](#authors)
 
 # Channel
@@ -594,7 +594,7 @@ A receiving node:
    * [`channel_id`:`channel_id`]
    * [`u64`:`last_update_number`]
    * [`partial_sig`:`update_psig`]
-   * [`nonce`:`next_nonce`]
+   * [`nonce`:`fresh_nonce`]
 
 #### Requirements
 
@@ -611,12 +611,19 @@ A sending node:
   - If it has sent `update_signed` on the other peer's turn without receiving `yield`:
     - MUST NOT consider that `update_signed` sent when setting `last_update_number`.
   - MUST set `update_psig` to the `last_update_number` channel state
-    update transaction's partial signature.
- - MUST set `next_nonce` to the nonce to be used for the next channel update partial signature.
+    update transaction's partial signature created by the local node.
+  - MUST set `fresh_nonce` to the newly generated nonce to be used for the next channel update partial signature.
 
 A receiving node:
+  - ???
 
-Upon reconnection when `channel_reestablish_eltoo` is exchanged by all channel peers:
+Upon reconnection when `channel_reestablish_eltoo` is exchanged by all channel peers a node:
+  - If both local and remote `last_update_number`s are 0:
+    - MUST retransmit `funding_locked`.
+  - otherwise:
+    - MUST NOT retransmit `funding_locked`.
+  - upon reconnection:
+    - MUST ignore any redundant `funding_locked` it receives.
   - If both local and remote `last_update_number`s are identical:
     - partial signature from the non-turn-taker can be applied to the turn-taker's
       transaction if not previously received before disconnect
@@ -635,6 +642,18 @@ Upon reconnection when `channel_reestablish_eltoo` is exchanged by all channel p
   - If `next_nonce` is not a valid BIP-musig2 nonce
     - MUST send a `warning` and close the connection, or send an
       `error` and fail the channel.
+
+A node:
+  - MUST NOT assume that previously-transmitted messages were lost,
+    - if it has sent a previous `update_signed` message:
+      - MUST handle the case where the corresponding update transaction is
+      broadcast at any time by the other side,
+        - Note: this is particularly important if the node does not simply
+        retransmit the exact `update_` messages as previously sent.
+  - upon reconnection:
+    - if it has sent a previous `shutdown`:
+      - MUST retransmit `shutdown`.
+
 
 #### Rationale
 
