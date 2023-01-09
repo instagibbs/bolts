@@ -599,11 +599,43 @@ A receiving node:
 #### Requirements
 
 Reestablishment of eltoo channels is handled similarly
-to the penalty-based simplified update scheme, with
-the extraneous fields removed, and using the `_eltoo`
+to the penalty-based simplified update scheme with
+the extraneous fields removed and using the `_eltoo`
 based messages respectively.
 
-All nodes MUST discard any prior `nonce` fields on loss of connection.
+
+A funding node:
+  - upon disconnection:
+    - if it has broadcast the funding transaction:
+      - MUST remember the channel for reconnection.
+    - otherwise:
+      - SHOULD NOT remember the channel for reconnection.
+
+A non-funding node:
+  - upon disconnection:
+    - if it has sent the `funding_signed_eltoo` message:
+      - MUST remember the channel for reconnection.
+    - otherwise:
+      - SHOULD NOT remember the channel for reconnection.
+
+A node:
+  - MUST handle continuation of a previous channel on a new encrypted transport.
+  - upon disconnection:
+    - MUST reverse any uncommitted updates sent by the other side (i.e. all
+    messages beginning with `update_` for which no `update_signed` has
+    been received).
+      - Note: a node MAY have already used the `payment_preimage` value from
+    the `update_fulfill_htlc`, so the effects of `update_fulfill_htlc` are not
+    completely reversed.
+    - MUST discard any secret MuSig2 nonces for the channel
+  - upon reconnection:
+    - if a channel is in an error state:
+      - SHOULD retransmit the error packet and ignore any other packets for
+      that channel.
+    - otherwise:
+      - MUST transmit `channel_reestablish_eltoo` for each channel.
+      - MUST wait to receive the other node's `channel_reestablish_eltoo`
+        message before sending any other messages for that channel.
 
 A sending node:
   - MUST set `last_update_number` to the value of the channel state number of the last
@@ -622,8 +654,7 @@ Upon reconnection when `channel_reestablish_eltoo` is exchanged by all channel p
     - MUST retransmit `funding_locked`.
   - otherwise:
     - MUST NOT retransmit `funding_locked`.
-  - upon reconnection:
-    - MUST ignore any redundant `funding_locked` it receives.
+  - MUST ignore any redundant `funding_locked` it receives.
   - If both local and remote `last_update_number`s are identical:
     - partial signature from the non-turn-taker can be applied to the turn-taker's
       transaction if not previously received before disconnect
@@ -631,11 +662,10 @@ Upon reconnection when `channel_reestablish_eltoo` is exchanged by all channel p
     - a new turn then starts with the peer with the lesser
       SEC1-encoded node_id.
   - If the local and remote node's `last_update_number` is exactly one different:
-      - The turn is aborted. All pending updates are removed, next state number is one greater
-        than the largest reported state number, and a new turn starts with the peer with
-        the lesser SEC1-encoded node_id.
-      - Offering nodes MUST be able to handle the aborted turns' update transaction, settlement transaction,
-        and resolved HTLCs on-chain.
+      - The node with the higher update number retains its turn, retransmits
+        all updates and then a newly partially signed `update_signed` message using
+        the `fresh_nonce`s exchanged from each peer.
+      - Nodes then continue normal channel operation
   - otherwise:
     - ??? FIXME must be something we can do here to be nice to the peer that forgot stuff.
       Ahead node can just convince the peer of latest state and share the entire tx?
