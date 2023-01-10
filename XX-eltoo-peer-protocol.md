@@ -41,20 +41,18 @@ When `option_eltoo` is negotiated, this message contains information about
 a node and indicates its desire to set up a new eltoo channel. This is the first
 step toward creating the funding transaction and the initial update transaction. 
 
-FIXME: Generate/send htlc pubkeys, since hot/cold policy may be in place
-
 1. type: 32778 (`open_channel_eltoo`)
 2. data:
    * [`chain_hash`:`chain_hash`]
    * [`32*byte`:`temporary_channel_id`]
    * [`u64`:`funding_satoshis`]
    * [`u64`:`push_msat`]
-   * [`u64`:`dust_limit_satoshis`]
    * [`u64`:`max_htlc_value_in_flight_msat`]
    * [`u64`:`htlc_minimum_msat`]
    * [`u16`:`shared_delay`]
    * [`u16`:`max_accepted_htlcs`]
    * [`point`:`funding_pubkey`]
+   * [`point`:`htlc_pubkey`]
    * [`point`:`settlement_pubkey`]
    * [`byte`:`channel_flags`]
    * [`nonce`:`next_nonce`]
@@ -73,7 +71,7 @@ FIXME: Generate/send htlc pubkeys, since hot/cold policy may be in place
 
 Changed fields from `open_channel`:
   - `to_self_delay` is replaced with a symmetrical `shared_delay` which must be agreed upon by nodes. This is currently set by the opener.
-  - `dust_limit_satoshis` must be shared, and is currently set by the opener. A negotiation protocol can be added in future versions.
+  - `dust_limit_satoshis` is removed in favor of a static limit of 546 satoshis.
   - there is no `revocation_basepoint` as the security of the eltoo design does not rely on penalty transactions
   - there is no `delayed_payment_basepoint`, as there are no second-stage HTLC transactions to be pre-signed
   - `payment_basepoint` is replaced with a static `settlement_pubkey`
@@ -87,7 +85,7 @@ Sending node:
 
 A receiving node:
   - MUST either accept the `shared_delay` given by the sender, of fail the channel
-  - if `next_nonce` is not a valid BIP-musig2 nonce
+  - if `next_nonce` is not a valid BIP-musig2 public nonce
     - MUST send a `warning` and close the connection, or send an
       `error` and fail the channel.
   - otherwise MUST store and apply `next_nonce` to the associated `funding_created` transaction,
@@ -116,13 +114,13 @@ transactions.
 1. type: 32769 (`accept_channel_eltoo`)
 2. data:
    * [`32*byte`:`temporary_channel_id`]
-   * [`u64`:`dust_limit_satoshis`]
    * [`u64`:`max_htlc_value_in_flight_msat`]
    * [`u64`:`htlc_minimum_msat`]
    * [`u32`:`minimum_depth`]
    * [`u16`:`shared_delay`]
    * [`u16`:`max_accepted_htlcs`]
    * [`point`:`funding_pubkey`]
+   * [`point`:`htlc_pubkey`]
    * [`point`:`settlement_pubkey`]
    * [`nonce`:`next_nonce`]
    * [`accept_channel_eltoo_tlvs`:`tlvs`]
@@ -141,14 +139,13 @@ transactions.
 The same requirements as `accept_channel`, except a few redundant fields removed.
 
 Sending node:
-  - MUST set `dust_limit_satoshis` to the same value as set in `open_channel`
-  - MUST set `shared_delay` to the same value as set in `open_channel`
+  - MUST set `shared_delay` to the same value as received in `open_channel`
 
-  - if `next_nonce` is not a valid BIP-musig2 nonce
+  - if `next_nonce` is not a valid BIP-musig2 public nonce
     - MUST send a `warning` and close the connection, or send an
       `error` and fail the channel.
-  - otherwise MUST store and apply `next_nonce` to the associated `funding_signed` transaction,
-      unless channel reestablishment occurs, in which the nonces must be discarded
+  - otherwise MUST store and apply `next_nonce` to the associated `funding_signed_eltoo`
+      partial signature, unless channel reestablishment occurs, in which the nonce must be discarded
 
 
 #### Rationale
@@ -177,11 +174,11 @@ There is no `signature` field sent, or required.
 
 The sender MUST set:
   - `update_psig` to the valid partial signature using its `funding_pubkey` for the initial update transaction and the previously sent `nonce`s
-    from `open_channel_eltoo` and `accept_channel_eltoo` messages, as defined in [BOLT #3](03-transactions.md#update-transaction).
+    from `open_channel_eltoo` and `accept_channel_eltoo` messages, as defined in [BOLT #???](XX-eltoo-transactions.md#update-transaction).
   - `next_nonce` to a valid BIP-musig2 nonce to be used for the next channel update during the same connection
 
 The recipient:
-  - if `update_psig` is incorrect:
+  - if `update_psig` is not a valid BIP-musig2 partial signature for the update transaction:
     - MUST send a `warning` and close the connection, or send an
       `error` and fail the channel.
   - if `next_nonce` is not a valid BIP-musig2 nonce
@@ -192,11 +189,9 @@ The recipient:
 
 #### Rationale
 
-Eltoo style channels require two pre-signed transactions for backing out value, rather than one.
-
 ### The `funding_signed_eltoo` Message
 
-This message gives the funder the signature it needs for the first
+This message gives the funder the remote partial signature it needs for the first
 update transaction, so it can broadcast the transaction knowing that funds
 can be redeemed, if need be. It is sent in response to `funding_created_eltoo`.
 
@@ -221,12 +216,12 @@ Both peers:
 
 The sender MUST set:
   - `channel_id` by exclusive-OR of the `funding_txid` and the `funding_output_index` from the `funding_created_eltoo` message.
-  - `update_psig` to the valid BIP-musig2 partial signature, using its `update_pubkey` for the initial update transaction, and the previously sent `nonce`s
-    from `open_channel_eltoo` and `accept_channel_eltoo` messages as defined in [BOLT #3](03-transactions.md#update-transaction).
+  - `update_psig` to the valid BIP-musig2 partial signature, using its `funding_pubkey` for the initial update transaction, and the previously sent `nonce`s
+    from `open_channel_eltoo` and `accept_channel_eltoo` messages as defined in [BOLT #??](XX-eltoo-transactions.md#update-transaction).
   - `next_nonce` to a valid BIP-musig2 nonce to be used for the next channel update during the same connection
 
 The recipient:
-  - if `update_psig` is incorrect:
+  - if `update_psig` is an invalida partial signature for the corresponding update transaction:
     - MUST send a `warning` and close the connection, or send an
       `error` and fail the channel.
   - MUST NOT broadcast the funding transaction before receipt of a valid `funding_signed_eltoo`.
@@ -240,8 +235,6 @@ The recipient:
 
 
 #### Rationale
-
-Eltoo style channels require two pre-signed transactions for backing out value, rather than one.
 
 ### The `funding_locked_eltoo` Message
 
@@ -269,13 +262,9 @@ other node after a reasonable timeout.
 
 #### Rationale
 
-Same rationale as ln-penalty.
+Same rationale as `funding_locked`.
 
 ## Eltoo Channel Close
-
-Channel closes are nearly identical to BOLT02 channel closes, with the main
-difference being the `closing_signed_eltoo` requiring 2 rounds for nonce
-sharing to make a MuSig2 signature.
 
 Closing happens in two stages:
 1. one side indicates it wants to clear the channel (and thus will accept no new HTLCs)
@@ -308,6 +297,10 @@ along with the `scriptpubkey` it wants to be paid to.
    * [`nonce`:`nonce`]
 
 #### Requirements
+
+Same requirements as `shutdown`, but with corresponding `_eltoo` messages.
+
+In addition:
 
 A sending node:
 
@@ -378,13 +371,13 @@ We use MuSig2 multisignature algorithm to close eltoo channels. This allows a he
 operating channel to appear to be a single pubkey output even after being spent,
 reducing fees in the common case and increasing the anonymity set.
 
-It's critically important that nonces are never re-used, giving the recommendation
-that the nonces be wiped in between sessions.
+It's critically important that nonces are never re-used; the recommendation
+that the nonces be wiped in between sessions is paramount for security of funds.
 
 ### Eltoo Simplified Operation
 
-If `open_channel_eltoo` was used to initiate the channel, `option_simplified_update` rules are applied,
-with modifications.
+If `open_channel_eltoo` was used to initiate the channel, a simple turn-taking approach
+is taken for channel updates.
 
         +-------+                                     +-------+
         |       |--(1)---- update_add_htlc ---------->|       |
@@ -398,10 +391,6 @@ with modifications.
         |       |                                     |       |
         +-------+                                     +-------+
 
-The flow is similar except for the symmetrical state. This means there is no
-`revoke_and_ack` message, meaning all updates are immediately applied to the
-pending update and settlement transactions and signed with `update_signed`.
-
 Note that once the recipient of an HTLC offer receives a
 `update_signed` message, the new offers may be forwarded immediately
 as the update and settlement transactions can be finalized locally and broadcasted at any point.
@@ -413,7 +402,7 @@ even if older state is broadcast.
 
 A node:
   - MUST NOT send `yield` unless `option_simplified_update` is negotiated.
-  - MUST track whose turn it is, starting with the peer with the lesser SEC1-encoded node_id.
+  - MUST track whose turn it is, starting on channel creation with the peer with the lesser SEC1-encoded node_id.
   - MUST give up its turn when:
     - sending `update_signed`
     - sending a `yield`
@@ -438,10 +427,9 @@ and channel reestablishment, defined by `channel_reestablish_eltoo`
 
 #### Rationale
 
-Update numbers will stay synchronized after the successful end of each turn. On reconnection this allows
-a trivial comparison to determine if there was an unfinished turn. Note that this means upgrading of penalty
-channels to eltoo channels is made more difficult if done in the future as we can not assume the update
-numbers are synchronized.
+Synchronous turn-taking allows for a simpler protocol, while still allowing for optimistic
+behavior to be implemented if higher transactional velocity is desired. Eltoo transactions
+are symmetrical, so they naturally fit this paradigm.
 
 ### Forwarding HTLCs
 
@@ -451,7 +439,8 @@ and `update_signed_ack`:.
 
 The respective **addition/removal** of an HTLC is considered *irrevocably committed* when:
 
-1. The settlement transaction **with/without** it is committed to by the offering node
+1. The settlement transaction **with/without** it is committed to by the offering node by
+  the `update_signed` message.
 2. The settlement transaction **with/without** it has been irreversibly committed to
 the blockchain.
 
@@ -472,7 +461,7 @@ to that outgoing HTLC.
 
 #### Rationale
 
-Same rationale as BOLT02 except we do not have HTLC-X second stage transactions
+Same rationale as BOLT02 except we do not have HTLC-Success and HTLC-Timeout second-stage transactions.
 
 ### `shared_delay` Selection
 
@@ -491,11 +480,23 @@ there is a trade-off between safety and routing forwarding competitiveness.
 
 ### `cltv_expiry_delta` Selection
 
-FIXME eltoo reasoning
+Expiry of HTLCs in Eltoo must consider the `shared_delay` parameter, as that is in the
+critical path of resolving the contract.
+
+One particular troublesome scenario:
+
+1. A node commits to a specific HTLC using `update_signed` message
+1. Counterparty goes to chain with the penultimate state that was signed by both parties
+1. Counterparty waits `shared_delay` - 1 blocks, then submits the final state the node
+  committed to.
+
+This results in almost 2 times `shared_delay` of HTLC resolutions possible.
 
 #### Requirements
 
-Same requirements as BOLT02
+`cltv_expiry_delta` should take the above `2*shared_delay` and add it to
+the value considered independently for timely inclusion once the settlement path
+is spendable. See the considerations for BOLT02 for choosing this component of the value.
 
 ### Adding an HTLC: `update_add_htlc`
 
@@ -508,12 +509,13 @@ ame requirements as BOLT02
 ### Committing Updates So Far: `update_signed`
 
 When a node has changes for the shared update for an eltoo channel, it can apply them,
-sign the resulting transaction (as defined in [BOLT #3](03-transactions.md)), and send a
+sign the resulting transaction (as defined in [BOLT #??](XX-eltoo-transactions.md)), and send a
 `update_signed` message.
 
-Once the recipient of `update_signed` checks the signatures and knows
+Once the recipient of `update_signed` checks the partial signature and knows
 it has a valid new update transaction, it replies with its own `update_signed_ack`
-message over the same transactions to ACK the updates and finalize it.
+message over the same transactions and its own partial signature to ACK the updates and finalize
+the state update.
 
 1. type: 32775 (`update_signed`)
 2. data:
@@ -530,10 +532,8 @@ A sending node:
   - during their turn(or when attempting to cause the counter-party to yield):
     - MUST NOT send a `update_signed` message that
       does not include any updates.
-    - MAY send a `update_signed` message that only
-      alters the fee.
   - otherwise:
-    - MUST NOT include any changes
+    - MUST NOT propose any changes
 
 A receiving node:
   - during another's turn:
@@ -545,12 +545,13 @@ A receiving node:
         - MUST MUST send a `warning` and close the connection, or send an
           `error` and fail the channel.
     - otherwise MUST respond with a `update_signed_ack` message of their own.
-    - MUST consider the transaction as final
+    - MUST consider the transaction as committed by the sender
 
 #### Rationale
 
 HTLCs outputs do not require signatures by the offerer, which is why only a single signature
-for update transactions is required at this stage.
+for update transactions is required at this stage. Settlement transactions use a
+covenant commitment, therefore they do not require another signature as well.
 
 ### Finalizing the update: `update_signed_ack`
 
@@ -564,7 +565,7 @@ for update transactions is required at this stage.
 
 A sending node:
   - MUST set `update_psig` to a valid partial signature for the update transaction as defined
-    in [BOLT #3](03-transactions.md).
+    in [BOLT #??](XX-eltoo-transactions.md).
   - MUST set `next_nonce` to a valid BIP-musig2 nonce.
 
 A receiving node:
@@ -578,8 +579,8 @@ A receiving node:
 
 ### Updating Fees: `update_fee`
 
-No fees are attached to update or settlement transactions, so this message is
-unused.
+No fees are attached to update or settlement transactions and instead rely
+on ephemeral anchors for bringing fees, so this message is invalid.
 
 ### Requirements
 
