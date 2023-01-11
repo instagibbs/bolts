@@ -36,31 +36,14 @@ roughly detailed [here](https://gist.github.com/instagibbs/b3095752d6289ab52166c
 The consensus assumptions are:
 
 1. These transactions assume [BIP118](https://github.com/bitcoin/bips/blob/master/bip-0118.mediawiki) in its current written form.
-1. No SIGHASH_GROUP like functionality, so we either commit via SINGLE or ALL in each situation.
-1. We rely on both the "re-binding" functionality as designed in the original eltoo paper, as well
-as the signature in output covenant trick that was discovered by other researchers.
 
-The policy assumptions and implications in short are roughly detailed [here](https://gist.github.com/instagibbs/b3095752d6289ab52166c04df55c1c19).
-in short:
+The policy assumptions are:
 
-1. Package relay is implemented and deployed, as per [this link](https://github.com/bitcoin/bips/pull/1324)
-1. [This policy](https://lists.linuxfoundation.org/pipermail/bitcoin-dev/2022-September/020937.html) is adopted for rule#3 pinning mitigation.
-1. Ephemeral Anchors are implemented. This new output type must be immediately spent in package relay.
-   This output is allowed dust-level values, including zero.
-1. Annex data is allowed, up to at least 33 bytes worth for our purposes.
-1. APO spends only allow a single input (to avoid ACP pinning)
-
-Alternative designs not implemented:
-
-1. Use SIGHASH_GROUP. This would allow more flexible bring your own fees for settlement
-transactions, as it allows the creation of additional secure change outputs. The motivation
-here is fairly weak, and requires another BIP to be designed, implemented, and accepted
-by the community for limited gain. And even if implemented, it may introduce new pinning
-vectors that would need to be solved.
-1. One-shot asymmetric channel constructions, such as [Inherited IDs](https://github.com/JohnLaw2/btc-iids/blob/main/iids14.pdf) and with [NOINPUT/BIP118](https://lists.linuxfoundation.org/pipermail/lightning-dev/2018-July/001363.html)
-which may require deeper changes to the Bitcoin protocol, and may not resolve in HTLC forwards of 0.5 RTT, and seem to be incompatible with watchtowers.
-1. Punishment mechanisms could be reintroduced for 2-party channels with [asymmetric witnesses](https://github.com/LLFourn/witness-asymmetric-channel), at the cost of increased complexity, HTLC replacement in lockstep, and inflexibility to multiparty scenarios. [This paper](https://eprint.iacr.org/2022/1295.pdf) as well, which seems simplest.
-
+1. Package relay is implemented and deployed, as per [this link](https://github.com/bitcoin/bips/pull/1382)
+1. [Package RBF](https://github.com/bitcoin/bitcoin/pull/25038) is adopted for rule#3 pinning mitigation.
+1. [Ephemeral Anchors](https://github.com/bitcoin/bitcoin/pull/26403) are implemented.
+1. Annex data is allowed, up to at least 33 bytes worth for our purposes. [Should update to this format.](https://github.com/bitcoin-inquisition/bitcoin/pull/9)
+1. Mitigation for ACP-style pinning on APO (how to stop junk inputs from being added to APO transactions?)
 
 # Transactions
 
@@ -70,20 +53,19 @@ The biggest difference between this BOLT and [BOLT03](03-transactions.md) is the
 
 Each party in the relevant channel has an identical view of the transactions being collaboratively created. This means that we no longer
 rely on revocation and punishment transactions to enforce correctness, but on-chain claim and response periods via two types of transactions:
-update transactions to make a "claim" of latest transaction version, and settlement transactions to expand out payments once the delay expires.
+
+1. update transactions to make a "claim" of latest channel state
+1. settlement transactions to expand out payments once challenge phase ends.
 
 ## Transaction Output Ordering
 
-The same rules for output ordering from [BOLT03](03-transactions.md#transaction-output-ordering) applies to settlement transactions.
+The same rules for output ordering from [BOLT03](03-transactions.md#transaction-output-ordering) applies to update and settlement transactions at time of signing.
 
 ## Rationale
 
-Only the settlement transaction has multiple outputs that are collaboratively built with the channel peer, therefore it can only be
-enforced here.
-
 ## Use of Taproot
 
-Most transaction outputs used here are pay-to-taproot<sup>[BIP341](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#constructing-and-spending-taproot-outputs)</sup> (P2TR) outputs. We are ommitting all non-script related witness stack items for brevity such as control block, inner pubkeys, et al.
+All outputs except ephemeral anchors are pay-to-taproot<sup>[BIP341](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#constructing-and-spending-taproot-outputs)</sup> (P2TR) outputs. We are ommitting all non-script related witness stack items for brevity such as control block, inner pubkeys, et al.
 
 A `<>` designates an empty vector as required for compliance with [BIP342](https://github.com/bitcoin/bips/blob/master/bip-0342.mediawiki)
 
@@ -91,8 +73,8 @@ All taproot leaf versions are 0xC0 unless stated otherwise.
 
 ## Use of miniscript
 
-[Miniscript](https://bitcoin.sipa.be/miniscript/) is used whenever possible to avoid ambiguity in notation,
-and allow for further analysis.
+[Miniscript](https://bitcoin.sipa.be/miniscript/) compatibille scripts are used whenever possible to
+avoid ambiguity in notation, and allow for further analysis.
 
 ## Funding Transaction Output
 
@@ -138,9 +120,11 @@ with the policy of `pk(1)`
      * control block: 0xC0 marker for tapscript, internel public key, merkle proof unless spending funding tx
      * tapscript: EXPR_UPDATE(m+1)
      * `signature_for_inner_pubkey`
-* txout count: 1
-   * `txout[0]` amount: the channel capacity
-   * `txout[0]` script: `tr(aggregated_key, {EXPR_UPDATE(n+1), EXPR_SETTLE(n)})`
+* txout count: 2
+   * `txout[0]` amount: 0
+   * `txout[0]` script: `OP_2` (ephemeral anchor)
+   * `txout[1]` amount: the channel capacity
+   * `txout[1]` script: `tr(aggregated_key, {EXPR_UPDATE(n+1), EXPR_SETTLE(n)})`
 
 and where EXPR_SETTLE(n) =
 
@@ -149,12 +133,11 @@ and where EXPR_SETTLE(n) =
 where `CovSig(x)` is the SIGHASH_ALL|ANYPREVOUTANYSCRIPT signature of the corresponding settlement transaction with a
 locktime of `x`, and `1_G` the 33-byte BIP118 public key matching the secp256k1 generator `G`, using the [BIP340](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki#Default_Signing) "Default Signing" nonce derivation function, with no auxiliary input.
 
-and where `signature_for_inner_pubkey uses SIGHASH_SINGLE|ANYPREVOUTANYSCRIPT.
+and where `signature_for_inner_pubkey uses SIGHASH_ALL|ANYPREVOUTANYSCRIPT.
 
 Note that the locktime must increase monotonically as it's used as the consensus ratchet for allowing rebinding of updates.
 
 FIXME Use some standardized annex formatting to avoid app/consensus collisions
-FIXME Sneak a few annex bytes into nsequence since we aren't using relative timelock?
 
 ### Rationale
 
@@ -176,12 +159,14 @@ transaction with the latest update transaction, without requiring particpants to
 settlement states forever. This is due to the signature that is included in the script, which cannot
 be otherwise deterministically regenerated without access to the full settlement state.
  Alternatively, we could add another round-trip to HTLC additions and forwards,
-as well as further complicate the protocol. FIXME we may want to devise an OP_RETURN like marking
-that will never be used in a softfork definition.
+as well as further complicate the protocol.
 
 The "state-masking offset" is used to hide the total number of updates in the channel from
 blockchain observers. Future versions of this spec can introduce a randomized negotiation
 of this value.
+
+The ephemeral anchor will always be of value 0(and the other non-0), so output sorting will result in
+the ephemeral anchor output being first.
 
 ## Settlement Transaction
 
@@ -236,32 +221,32 @@ timeout. Unlike BOLT03, these require no second stage transactions, and can be s
 
 where EXPR_SUCCESS =
 
-`<settlement_pubkey> OP_CHECKSIGVERIFY OP_SIZE <20> OP_EQUALVERIFY OP_HASH160 <H>
+`<htlc_pubkey> OP_CHECKSIGVERIFY OP_SIZE <20> OP_EQUALVERIFY OP_HASH160 <H>
 OP_EQUAL`
 
-with a policy of `and(pk(settlement_pubkey),hash160(H))`
+with a policy of `and(pk(htlc_pubkey),hash160(H))`
 
-where `H` is the payment hash and `settlement_pubkey` the *recipient* pubkey
+where `H` is the payment hash and `htlc_pubkey` the *recipient* pubkey
 
 and EXPR_TIMEOUT =
 
-`<settlement_pubkey> OP_CHECKSIGVERIFY N OP_CHECKLOCKTIMEVERIFY`
+`<htlc_pubkey> OP_CHECKSIGVERIFY N OP_CHECKLOCKTIMEVERIFY`
 
-with policy of `and(after(N),pk(settlement_pubkey))`
+with policy of `and(after(N),pk(htlc_pubkey))`
 
-where `N` is the HTLC expiry blockheight, and `settlement_pubkey` is the *offerer's* pubkey.
+where `N` is the HTLC expiry blockheight, and `htlc_pubkey` is the *offerer's* pubkey.
 
  The key-spend path is currently unused.
 
 The recipient node can redeem the HTLC with the witness:
 
-    <payment_preimage> <recipient_settlement_pubkey_signature>
+    <payment_preimage> <recipient_htlc_pubkey_signature>
 
 And the offerer via:
 
-    <offerer_settlement_pubkey_signature>
+    <offerer_htlc_pubkey_signature>
 
-with the proper nlocktime set to include in the next block.
+on an otherwise valid transaction.
 
 #### Ephemeral Anchor Output
 
@@ -279,8 +264,8 @@ so that is the best we are going to do without committing to an expensive script
 
 ### Trimmed Outputs
 
-Peers agree on a `dust_limit_satoshis` below which outputs should
-not be produced; these outputs that are not produced are termed "trimmed". A trimmed output is
+Outputs with value below `dust_limit_satoshis` should not be produced;
+these outputs that are not produced are termed "trimmed". A trimmed output is
 considered too small to be worth creating and is instead added
 to the anchor output's value to be used as CPFP fees.
 
@@ -290,7 +275,7 @@ Fees are handled by spending outputs from the outputs of the settlement transact
 as the settlement transaction includes no fee itself. This relies on package
 relay and package CPFP.
 
-The update transaction:
+The settlement transaction:
   - for every `to_node` output:
     - if the amount of any of the settlement transaction `to_node` outputs would be
 less than `dust_limit_satoshis` set by the channel negotiation:
@@ -299,7 +284,7 @@ less than `dust_limit_satoshis` set by the channel negotiation:
       - MUST be generated as specified in [`to_node` Output](#to_node-output).
   - for every HTLC:
     - if the HTLC amount would be less than
-    `dust_limit_satoshis` set by the negotiation:
+    `dust_limit_satoshis`:
       - MUST NOT contain that output.
     - otherwise:
       - MUST be generated as specified in
@@ -349,17 +334,7 @@ will be with BIP341/342, for CPFP reasons?
 
 ## Dust Limits
 
-The `dust_limit_satoshis` parameter is used identically to BOLT03 except:
-
-### Unknown segwit versions
-
-Unknown segwit versions excludes BIP341 outputs defined as:
-
-- 8 bytes for the output amount
-- 1 byte for the script length
-- 34 bytes for the script (`OP_1` followed by a single push of 32 bytes)
-
-In Bitcoin Core the dust limit is FIXME
+These are statically set at 330 satoshis. 
 
 ## Update and Settlement Transaction Construction
 

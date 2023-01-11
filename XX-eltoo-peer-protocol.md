@@ -71,7 +71,7 @@ step toward creating the funding transaction and the initial update transaction.
 
 Changed fields from `open_channel`:
   - `to_self_delay` is replaced with a symmetrical `shared_delay` which must be agreed upon by nodes. This is currently set by the opener.
-  - `dust_limit_satoshis` is removed in favor of a static limit of 546 satoshis.
+  - `dust_limit_satoshis` is removed in favor of a static limit of 330 satoshis to support taproot outputs.
   - there is no `revocation_basepoint` as the security of the eltoo design does not rely on penalty transactions
   - there is no `delayed_payment_basepoint`, as there are no second-stage HTLC transactions to be pre-signed
   - `payment_basepoint` is replaced with a static `settlement_pubkey`
