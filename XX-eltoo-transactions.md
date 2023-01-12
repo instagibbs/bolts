@@ -137,7 +137,7 @@ and where `signature_for_inner_pubkey uses SIGHASH_ALL|ANYPREVOUTANYSCRIPT.
 
 Note that the locktime must increase monotonically as it's used as the consensus ratchet for allowing rebinding of updates.
 
-FIXME Use some standardized annex formatting to avoid app/consensus collisions
+FIXME Use some standardized annex formatting to avoid app/consensus collisions, aka Sunny Side of Annex
 
 ### Rationale
 
@@ -329,9 +329,6 @@ on CPFP of the single anchor output for propogation and timely inclusion into th
 Transaction replacement of the CPFP can be a way to increase the feerate of the overall
 package, even if a counterparty is making CPFP transactions.
 
-FIXME add details about how much weight these transactions
-will be with BIP341/342, for CPFP reasons?
-
 ## Dust Limits
 
 These are statically set at 330 satoshis. 
@@ -365,7 +362,7 @@ This transaction is relatively trivial to set up.
 
 # Authors
 
-[ FIXME: ]
+Greg Sanders <gsanders87@gmail.com>
 
 ![Creative Commons License](https://i.creativecommons.org/l/by/4.0/88x31.png "License CC-BY")
 <br>

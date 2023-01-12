@@ -144,11 +144,6 @@ other HTLC outputs:
           - SHOULD use [replace-by-fee](https://github.com/bitcoin/bips/blob/master/bip-0125.mediawiki) or other mechanism on the anchor spending transaction if it proves insufficient for timely inclusion in a block.
           - SHOULD then handle the rest of the flow as described in the rest of this document/
 
-        FIXME FXIME duplicated. this needed?
-        - After `shared_delay` timeout, if the update transaction output isn't otherwise resolved, MUST broadcast the associated *settlement transaction*.
-          - MUST spend the epehemeral anchor that contains the trimmed value in order to induce inclusion in a block in a timely manner to enforce final state
-          - MAY spend other settlement outputs along with ephemeral anchor to include fees
-
 ## Rationale
 
 In the early stages of a channel, it's common for one side to have
@@ -373,7 +368,7 @@ A node:
 
 # Authors
 
-[FIXME:]
+Greg Sanders <gsanders87@gmail.com>
 
 ![Creative Commons License](https://i.creativecommons.org/l/by/4.0/88x31.png "License CC-BY")
 <br>
