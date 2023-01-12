@@ -12,7 +12,7 @@ operation, and closing.
       * [The `accept_channel_eltoo` Message](#the-accept_channel_eltoo-message)
       * [The `funding_created_eltoo` Message](#the-funding_created_eltoo-message)
       * [The `funding_signed_eltoo` Message](#the-funding_signed_eltoo-message)
-      * [The `funding_locked_eltoo` Message](#the-funding_locked_eltoo-message)
+      * [The `channel_ready_eltoo` Message](#the-channel_ready_eltoo-message)
     * [Channel Close](#channel-close)
       * [Closing Initiation: `shutdown_eltoo`](#closing-initiation-shutdown)
       * [Closing Negotiation: `closing_signed_eltoo`](#closing-negotiation-closing_signed)
@@ -236,18 +236,18 @@ The recipient:
 
 #### Rationale
 
-### The `funding_locked_eltoo` Message
+### The `channel_ready_eltoo` Message
 
-This message indicates that the funding transaction has reached the `minimum_depth` asked for in `accept_channel_eltoo`. Once both nodes have sent this, the channel enters normal operating mode.
+The same implications as `channel_ready`, but for an eltoo channel.
 
-1. type: 32772 (`funding_locked_eltoo`)
+1. type: 32772 (`channel_ready_eltoo`)
 2. data:
     * [`channel_id`:`channel_id`]
 
 #### Requirements
 
 The sender MUST:
-  - NOT send `funding_locked_eltoo` unless outpoint of given by `funding_txid` and
+  - NOT send `channel_ready_eltoo` unless outpoint of given by `funding_txid` and
    `funding_output_index` in the `funding_created_eltoo` message pays exactly `funding_satoshis` to the scriptpubkey specified in [BOLT #3](03-transactions.md#funding-transaction-output).
   - wait until the funding transaction has reached `minimum_depth` before
   sending this message.
@@ -256,13 +256,13 @@ A non-funding node (fundee):
   - SHOULD forget the channel if it does not see the correct funding
   transaction after a timeout of 2016 blocks.
 
-From the point of waiting for `funding_locked_eltoo` onward, either node MAY
+From the point of waiting for `channel_ready_eltoo` onward, either node MAY
 send an `error` and fail the channel if it does not receive a required response from the
 other node after a reasonable timeout.
 
 #### Rationale
 
-Same rationale as `funding_locked`.
+Same rationale as `channel_ready`.
 
 ## Eltoo Channel Close
 
@@ -683,10 +683,10 @@ A receiving node:
 
 Upon reconnection when `channel_reestablish_eltoo` is exchanged by all channel peers a node:
   - If both local and remote `last_update_number`s are 0:
-    - MUST retransmit `funding_locked`.
+    - MUST retransmit `channel_ready`.
   - otherwise:
-    - MUST NOT retransmit `funding_locked`.
-  - MUST ignore any redundant `funding_locked` it receives.
+    - MUST NOT retransmit `channel_ready`.
+  - MUST ignore any redundant `channel_ready` it receives.
   - If both local and remote `last_update_number`s are identical:
     - partial signature from the non-turn-taker can be applied to the turn-taker's
       transaction if not previously received before disconnect
