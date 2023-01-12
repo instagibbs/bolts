@@ -14,12 +14,11 @@ There are three ways a channel can end:
 to close the channel. They generate a *closing transaction* (which is similar to a
 settlement transaction, but without any pending payments) and publish it on the
 blockchain (see [BOLT #??: Channel Close](XX-eltoo-peer-protocol.md#channel-close)).
-2. The bad way (*unilateral close*): something goes wrong, possibly without evil
-intent on either side. Perhaps one party crashed, for instance. One side
-publishes latest *latest update transaction*. Note that the updating peer
-may not have received an ACK with partial signatures for this update.
-3. The ugly way (*inavalidated unilateral close*): something goes very wrong, peer
-publishes an update transaction that has been invalidated by a subsequent update.
+1. The bad way (*committed or complete unilateral close*): Someone publishes the latest transaction
+you have *committed* to and may have a *complete* signature for, either by sending `update_signed` or `update_signed_ack`. This includes the benign peer-is-offline case.
+1. The ugly way (*inavalidated unilateral close*): something goes very wrong, peer
+publishes an update transaction that has been invalidated by a subsequent update
+and you as a node may no longer be storing.
 
 The goal of this document is to explain exactly how a node should react when it
 encounters any of the above situations, on-chain.
@@ -49,6 +48,12 @@ once the *resolving* transaction is included in a block at least 100
 deep, on the most-work blockchain. 100 blocks is far greater than the
 longest known Bitcoin fork and is the same wait time used for
 confirmations of miners' rewards (see [Reference Implementation](https://github.com/bitcoin/bitcoin/blob/4db82b7aab4ad64717f742a7318e3dc6811b41be/src/consensus/tx_verify.cpp#L223)).
+
+A *committed* update and settlement transaction pair are the latest transactions your node has sent partial
+signatures for to your counterparty but have not received an `update_signed_ack` in response yet.
+
+A *complete* update and settlement transaction pair are the latest transactions your node have a full
+BIP340 signature for, which allows unilateral publishing by your node.
 
 ## Requirements
 
@@ -81,10 +86,10 @@ trigger any action.
 The local and remote nodes each hold a *update transaction*. 
 
 These transactions contain a single input and output signed with
-SIGHASH_SINGLE, which allows fee inputs and outputs to be added
-by the broadcasting node.
+SIGHASH_ALL|SIGHASH_ANYPREVOUTANYSCRIPT, which allows CPFP through
+the ephemeral anchor.
 
-Each later update transaction can be "re-bind"ed to spend
+Each update transaction should be "bound" to spend
 any prior funding or update output that is unresolved on the blockchain.
 
 See [BOLT #??: Update Transaction](XX-eltoo-transactions.md#update-transaction)
@@ -92,14 +97,15 @@ for more details.
 
 # Settlement Transaction
 
-Each node holds a symmetrical *settlement transaction*. Each of these
+Each node holds an identical *settlement transaction*. Each of these
 settlement transactions has up to two types of outputs. For each node:
 
-1. A node's main output_: Zero or one output, to pay a peer's
+1. A node's main `to_node` output: Zero or one output, to pay a peer's
 `settlement_pubkey`.
-1. A node's offered HTLCs_: Zero or more pending payments (*HTLCs*), to pay
+1. A node's offered HTLCs: Zero or more pending payments (*HTLCs*), to pay
 a peer in return for a payment preimage. One node's offered HTLC output is
-the other node's receiving HTLC output.
+the other node's receiving HTLC output. Again, the transaction is symmetrical
+unlike ln-penalty.
 
 As we rely on the publication of update transactions to enforce the final
 state, these outputs are allowed the be spent immediately and provide
@@ -111,7 +117,7 @@ for more details.
 # Failing a Channel
 
 Although closing a channel can be accomplished in several ways, the most
-efficient is preferred for privacy and fees.
+efficient, a mutual close, is preferred for privacy and fees.
 
 Various error cases involve closing a channel. The requirements for sending
 error messages to peers are specified in
@@ -120,7 +126,7 @@ error messages to peers are specified in
 ## Requirements
 
 A node:
-  - if the *current settlement transaction* does NOT contain a `to_node` output to itself or
+  - if the *complete/committed settlement transactions*  do NOT contain a `to_node` output to itself or
 other HTLC outputs:
     - MAY simply forget the channel.
   - otherwise:
@@ -130,12 +136,15 @@ other HTLC outputs:
       - if the *mutual close* transaction fees reveal as insufficient, MAY use a CPFP output
     - otherwise:
       - if the node knows or assumes its channel state is outdated:
-        - SHOULD NOT broadcast its *last update transaction*.
+        - SHOULD NOT broadcast its *complete/committed update transactions*.
       - otherwise:
-        - MUST broadcast the *last update transaction*, for which it has a
-        signature as well as the signature and data for the settlement transaction, to perform a *unilateral close*.
-          - MUST attach and spend an ephemeral anchor in order to induce inclusion in a block in a timely manner to enforce final state via CPFP
+        - MUST broadcast the *complete update transaction*, for which it has a
+        signature, to perform a *unilateral close*.
+          - MUST spend an ephemeral anchor in order to induce inclusion in a block in a timely manner to enforce final state via CPFP
           - SHOULD use [replace-by-fee](https://github.com/bitcoin/bips/blob/master/bip-0125.mediawiki) or other mechanism on the anchor spending transaction if it proves insufficient for timely inclusion in a block.
+          - SHOULD then handle the rest of the flow as described in the rest of this document/
+
+        FIXME FXIME duplicated. this needed?
         - After `shared_delay` timeout, if the update transaction output isn't otherwise resolved, MUST broadcast the associated *settlement transaction*.
           - MUST spend the epehemeral anchor that contains the trimmed value in order to induce inclusion in a block in a timely manner to enforce final state
           - MAY spend other settlement outputs along with ephemeral anchor to include fees
@@ -183,36 +192,32 @@ to react to on-chain events properly.
 
 A node:
   - upon discovering an *invalidated update transaction* on chain:
-    - Until latest update transaction is mined or invalidated settlement transaction
-      resolves the state output:
-      - SHOULD estimate the cost of updating current state output to the latest update transaction
+    - Until the nodes' committed or complete update transaction is mined:
+      - SHOULD estimate the cost of updating current state output in utxo set to the complete update transaction
         and settlement transaction, weighing it against the value claimable on-chain by the user in the latest.
         In the degenerate case of no `to_node` outputs to itself or HTLC outputs, there is no incentive
         to claim the latest channel state.
-      - Otherwise, MUST respond by publishing the latest update transaction, re-binding
+      - Otherwise, MUST respond by publishing the complete update transaction, re-binding
         to the invalidated update transactions' state output, recovering the necessary
         control block information from the invalidated update transaction's annex field.
       - If the latest update transaction is failing to be mined within the proper window,
         package RBF replacement with a higher fee ephemeral anchor spend is recommended
         to avoid old state being successfully used and to avoid fulfilled HTLCs with incoming
         value being timed out.
-    - If the latest update transaction is then confirmed:
-      - MUST wait `shared_delay` blocks of confirmation for this transaction
-          to publish the corresponding pre-signed *settlement transaction*
-      - If no HTLCs are to be resolved, publishing the settlement transaction
-        MAY be arbitrarily delayed by the node to save on fees, or use the ephemeral
-        anchor spend to make another transaction such as a direct payment, channel open,
-        etc. This may make recovery of funds less reliable if state is lost.
+    - MUST handle the publishing of the committed/complete update transaction as detailed in this document
 
 ## Rationale 
 
 In the case where we unconditionally aren't owed any funds for the latest settlement
 transaction, there is no need to spend funds to recover those funds. Otherwise,
 if it economically makes sense, the node wants the latest state to be confirmed.
+We must get a the latest state we have signatures for published(complete update),
+although our counterparty may at any time publish the latest committed update
+transaction, even if the local node doesn't have the full signatures already.
 
-# Unilateral Close Handling: Latest Update Transaction
+# Unilateral Close Handling: Committed/Complete Update Transaction
 
-In the other eltoo channel case, we see the latest channel state
+In another eltoo channel case, we see the latest channel state
 be confirmed on the blockchain, and must ensure that the settlement transaction
 outputs are created and then spent in a safe amount of time, for the case of
 HTLC outputs.
@@ -220,13 +225,14 @@ HTLC outputs.
 ## Requirements
 
 A node:
-  - upon discovering the *latest update transaction*:
-    - MUST wait `shared_delay` blocks of confirmation for this transaction
-      to publish the latest pre-signed *settlement transaction*
+  - upon discovering the *committed or complete update transaction* in the blockchain,
+    until that update transaction's state output is resolved:
+      - MUST wait `shared_delay` blocks of confirmation for this transaction,
+        then publish the corresponding *committed or complete settlement transaction*
 
 ## Rationale
 
-If your counter-party honestly had the latest channel state confirmed,
+If your counter-party honestly had one of the latest channel state confirmed,
 then the only thing to do is make sure settlement outputs are swept
 as necessary.
 
@@ -260,12 +266,12 @@ A node:
 It's not over until the state output is irrevocably resolved. Continue trying to
 enforce correct behavior until our subjective finality limit.
 
-# Unilateral Close Handling: Latest Settlement Transaction
+# Unilateral Close Handling: Committed/Complete Settlement Transaction
 
 ## Requirements
 
 A node:
-  - upon discovering the *latest settlement transaction*:
+  - upon discovering the *committed or complete settlement transaction*:
     - MUST attempt to resolve HTLCs within the timeout windows allotted
       by the CLTV in the outputs for fulfillment case, and 
     - MAY sweep its `to_node` output
@@ -280,7 +286,7 @@ fee is insufficient.
 ## HTLC Output Handling: Offerer
 
 Each HTLC output can only be spent by either the *offerer*, by spending the
-output  after it's timed out, or the *recipient*, if it
+output after it has timed out, or the *recipient*, if it
 has the payment preimage.
 
 There can be HTLCs which are not represented by any outputs: either
@@ -303,10 +309,10 @@ An offering node:
     - once the resolving transaction has reached reasonable depth:
       - MUST fail the corresponding incoming HTLC (if any).
   - for any committed HTLC that has been trimmed:
-    - once the update transaction that spent the funding output has reached reasonable depth(FIXME or just been spent? fast fail everyhting?):
+    - once the update transaction that spent the funding output has reached reasonable depth:
       - MUST fail the corresponding incoming HTLC (if any).
-    - if no *valid* commitment transaction contains an output corresponding to
-    the HTLC.
+    - if no committed/complete settlement transaction contains an output corresponding to
+    the HTLC:
       - MAY fail the corresponding incoming HTLC sooner.
 
 ### Rationale
@@ -332,7 +338,7 @@ There are only two possible cases for an offered HTLC:
 
 The missing case compared to ln-penalty channels is the case where the offerer
 is not yet irrevocably committed. Due to the symmetrical transaction, the offerer
-is immediately irrevocably committed on sending a `commitment_signed_eltoo`.
+is immediately irrevocably committed on sending a `update_signed_eltoo`.
 
 ### Requirements
 

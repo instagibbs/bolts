@@ -43,7 +43,7 @@ The policy assumptions are:
 1. [Package RBF](https://github.com/bitcoin/bitcoin/pull/25038) is adopted for rule#3 pinning mitigation.
 1. [Ephemeral Anchors](https://github.com/bitcoin/bitcoin/pull/26403) are implemented.
 1. Annex data is allowed, up to at least 33 bytes worth for our purposes. [Should update to this format.](https://github.com/bitcoin-inquisition/bitcoin/pull/9)
-1. Mitigation for ACP-style pinning on APO (how to stop junk inputs from being added to APO transactions?)
+1. Mitigation for ACP-style pinning on APO (how to stop 0-value junk inputs from being added to APO transactions?)
 
 # Transactions
 
