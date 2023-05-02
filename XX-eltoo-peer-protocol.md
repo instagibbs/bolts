@@ -448,6 +448,9 @@ no other effects.
 A more complex implementation can optimistically send a complete set
 of updates and `commitment_signed`, but must handle the possibility of
 that commitment being spent on-chain even if the peer does not yield.
+FIXME: Nonces currently do not support this, since you *MUST NOT* reuse
+nonces ever. This means we need a nonce for every version of the state.
+Each stored nonce is "assigned" to a turn taker, so to speak.
 
 Note that the reconnection logic is similarly simplified for an
 implementation which always waits for `yield`: both nodes cannot have
