@@ -238,7 +238,7 @@ Single-sig adaptor, sync, with APO?
         |       |                                 |       |
         +-------+                                 +-------+
 
-APO or APOAS?
+APO or APOAS? Async seems the same with APO.
 
 --------------------------------------------------------------------
 Single-sig Adaptor, *async*
@@ -247,24 +247,30 @@ Single-sig Adaptor, *async*
         |       |                                 |       |
         |       |--(1)---- update_offer_ptlc ---->|       | new amounts, lock info
         |       |--(2)---- update_offer_ptlc ---->|       | new amounts, lock info
-        |       |--(3)--- commitment_signed ----->|       | Alice's B_commit sig, Alice's presignatures for (2) and full sig for (4)
+        |       |--(X)---- done------------------>|       | Prompt Bob to send (4) adaptor sigs before Alice sends commit tx sig
+        |       |                                 |       |
+        |       |<-(X)--- b_o_btx_presign---------|       | Bob re-commits to all (4) PTLC-Success paths (must be before commit)
+        |       |                                 |       |
+        |       |--(3)--- commitment_signed ----->|       | Alice's B_commit sig
+        |       |--(X)--- a_o_btx_presign-------->|       | Alice's presignatures for (2)
+        |       |--(X)--- b_o_btx_sign----------->|       | Alice's full sig for (4)
         |       |                                 |       |
         |   A   |<-(4)--- revoke_and_ack ---------|   B   | Bob can broadcast local latest state safely, revoke older
-        |       |<-(5)--- self_ptlc_plz ----------|       | Bob says he's done, please give your local PTLC presignatures
+        |       |<-(X)--- done--------------------|       | Bob prompts Alice to re-commit to (1)
         |       |                                 |       |
-        |       |--(6)--- self_ptlc_signed ------>|       | Alice gives Bob her local presignatures, Bob can now give commit sig...
+        |       |--(X)--- a_o_atx_presign-------->|       | Alice re-commits to all (1) PTLC-Success paths (must be before commit)
         |       |                                 |       |
         |       |<-(7)-- commitment_signed -------|       | Bob's A_commit sig, Bob's presignatures for (3) and full sig for (1)
+        |       |<-(X)--- b_o_atx_presign---------|       | Bob's presignatures for (3)
+        |       |<-(X)--- a_o_atx_sign------------|       | Bob's full sig for (4)
         |       |                                 |       |
         |       |--(8)--- revoke_and_ack -------->|       | Alice is now committed, Bob can now safely forward
         |       |                                 |       |
         +-------+                                 +-------+
 
-2.5 RTT? Bob can't safely send `commitment_signed` until he has presignatures for all existing PTLCs, but structure
-needs to be fixed, so Bob needs to signal Alice that he's done updating. Or for 1.5RTT  Alice has to start shooting off presingatures
+3.5 RTT? Bob can't safely send `commitment_signed` until he has presignatures for all existing PTLCs, but structure
+needs to be fixed, so Bob needs to signal Alice that he's done updating. Or for 2.5RTT  Alice has to start shooting off presingatures
 and Bob sends `commitment_signed` once he gets the thing he wants. O(n^2) adaptor sigs seems uhhh not great.
-
-APO fixes this.
 
 Let's try MuSig again...
 
