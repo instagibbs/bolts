@@ -304,6 +304,38 @@ Alice can go to chain with her tx, invalidating his incoming PTLCs he's already 
 
 Think MuSig/sync is stuck with 2.5RTT fundamentally.
 
+Let's try *async* MuSig, handwave away nonces like before
+
+        +-------+                                 +-------+ Alice's turn
+        |       |<-(0)---- update_offer_ptlc -----|       | new amounts, lock info
+        |       |                                 |       |
+        |       |--(1)---- update_offer_ptlc ---->|       | new amounts, lock info
+        |       |--(2)---- update_offer_ptlc ---->|       | new amounts, lock info
+        |       |--(3)--- commitment_signed ----->|       | Bob knows full local commit tx sig for Alice
+        |       |                                 |       |
+        |       |<-(9)--- a_o_btx_psig------------|       | Bob psigning Alice-offered PTLC in Bob tx (2)
+        |       |                                 |       |
+        |       |--(11)-- a_o_btx_psig----------->|       | Alice psigning Alice-offered PTLC in Bob tx (2)
+        |       |--(XX)-- b_o_btx_psig----------->|       | Alice psigning Bob-offered PTLC in Bob tx (3) 
+        |       |                                 |       |
+        |       |<-(XX)--- b_o_btx_psig-----------|       | Bob psigning Bob-offered PTLC in Bob tx (4)
+        |   A   |<-(12)--- revoke_and_ack --------|   B   | All Alice-offered PTLCs locked in, new tx safe for Bob
+        |       |<-(XX)--- done ------------------|       | Bob is done, atx is fixed, psig time
+        |       |<-(8)--- a_o_atx_psig------------|       | Bob psigning Alice-offered PTLC in Alice tx (1)
+        |       |                                 |       |
+        |       |--(10)-- a_o_atx_psig----------->|       | Alice psigning Alice-offered PTLC in Alice tx (1)
+        |       |--(XX)-- b_o_atx_psig----------->|       | Alice psigning Bob-offered PTLC in Alice tx (3) 
+        |       |                                 |       |
+        |       |<-(XX)--- b_o_atx_psig-----------|       | Bob psigning Bob-offered PTLC in Alice tx (3)
+        |       |<-(13)-- commitment_signed ------|       | Alice now knows Bob's sigs for Alice's commit tx
+        |       |                                 |       | Bob wasn't allowed to add his own PTLCs so Alice can finish up
+        |       |--(14)--- revoke_and_ack ------->|       | Alice is now committed, Bob can now safely forward
+        |       |                                 |       |
+        +-------+                                 +-------+
+
+3.5RTT, and I don't see a way to remove a RTT since each offering side in atx needs to "go first" once
+
+It seems MuSig adds 1 RTT, and async-PTLCs 1 RTT.
 
 ### `update_offer_ptlc`
 
