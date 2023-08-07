@@ -223,6 +223,23 @@ do another fair exchange on top, as you can't know the nonces beforehand to pred
 
 Single-sig adaptor, sync, with APO?
 
+        +-------+                                 +-------+
+        |       |                                 |       | Alice's turn
+        |       |--(1)---- update_offer_ptlc ---->|       | new amounts, lock info, a_o_ptlc (unbound adaptor APO sig for {a,b}tx)
+        |       |--(2)---- update_offer_ptlc ---->|       | new amounts, lock info, a_o_ptlc (unbound adaptor APO sig for {a,b}tx)
+        |       |--(3)--- commitment_signed ----->|       | Alice's B_commit sig
+        |       |--(X)--- b_o_btx_sign----------->|       | Alice's full sig for (4) PTLC-timeouts back to Bob
+        |       |                                 |       |
+        |   A   |<-(4)--- revoke_and_ack ---------|   B   | Bob can broadcast latest state safely, revoke older
+        |       |<-(5)-- commitment_signed -------|       | Bob's A_commit sig
+        |       |<-(X)---a_o_atx_sign-------------|       | Bob's full sig for (1) PTLC-timeouts back to Alice
+        |       |                                 |       |
+        |       |--(6)--- revoke_and_ack -------->|       | Alice is now committed, Bob can now safely forward
+        |       |                                 |       |
+        +-------+                                 +-------+
+
+APO or APOAS?
+
 --------------------------------------------------------------------
 Single-sig Adaptor, *async*
         +-------+                                 +-------+
