@@ -212,11 +212,45 @@ Single-sig Adaptor, *async*
         |       |                                 |       |
         +-------+                                 +-------+
 
-2.5 RTT? Bob can't safely send commitment_signed until he has presignatures for all existing PTLCs, but structure
+2.5 RTT? Bob can't safely send `commitment_signed` until he has presignatures for all existing PTLCs, but structure
 needs to be fixed, so Bob needs to signal Alice that he's done updating. Or for 1.5RTT  Alice has to start shooting off presingatures
-and Bob sends commitment_signed once he gets the thing he wants. O(n^2) adaptor sigs seems uhhh not great.
+and Bob sends `commitment_signed` once he gets the thing he wants. O(n^2) adaptor sigs seems uhhh not great.
 
 APO fixes this.
+
+Let's try MuSig again...
+
+sync with MuSig:
+
+        +-------+                                 +-------+ Alice's turn
+        |       |--(1)---- update_offer_ptlc ---->|       | new amounts, lock info
+        |       |--(2)---- update_offer_ptlc ---->|       | new amounts, lock info
+        |       |--(3)--- commitment_signed ----->|       | Bob knows full local commit tx sig for Alice
+        |       |--(4)--- a_o_btx_nonce --------->|       | For all Alice-offered on Bob's tx (2)
+        |       |--(5)--- a_o_atx_nonce---------->|       | For all Alice-offered on Alice's tx (1)
+        |       |--(X)--- b_o_btx_nonce --------->|       | For all Bob-offered on Bob's tx (4)
+        |       |--(X)--- b_o_atx_nonce---------->|       | For all Bob-offered on Alice's tx (3)
+        |       |                                 |       |
+        |       |<-(6)--- a_o_atx_nonce-----------|       | For all Alice-offered on Alice's tx (1)
+        |       |<-(7)--- a_o_btx_nonce-----------|       | For all Alice-offered on Bob's tx (2)
+        |       |<-(X)--- b_o_atx_nonce-----------|       | For all Bob-offered on Alice's tx (3)
+        |       |<-(X)--- b_o_btx_nonce-----------|       | For all Bob-offered on Bob's tx (4)
+        |       |<-(8)--- a_o_atx_psig------------|       | Bob psigning Alice-offered PTLC in Alice tx (1)
+        |       |<-(9)--- a_o_btx_psig------------|       | Bob psigning Alice-offered PTLC in Bob tx (2)
+        |       |                                 |       |
+        |       |--(10)-- a_o_atx_psig----------->|       | Alice psigning Alice-offered PTLC in Alice tx (1)
+        |       |--(11)-- a_o_btx_psig----------->|       | Alice psigning Alice-offered PTLC in Bob tx (2)
+        |       |--(XX)-- b_o_atx_psig----------->|       | Alice psigning Bob-offered PTLC in Alice tx (3) 
+        |       |--(XX)-- b_o_btx_psig----------->|       | Alice psigning Bob-offered PTLC in Bob tx (3) 
+        |       |                                 |       |
+        |       |<-(XX)--- b_o_atx_psig-----------|       | Bob psigning Bob-offered PTLC in Alice tx (3)
+        |       |<-(XX)--- b_o_btx_psig-----------|       | Bob psigning Bob-offered PTLC in Bob tx (4)
+        |   A   |<-(12)--- revoke_and_ack --------|   B   | All Alice-offered PTLCs locked in, new tx safe for Bob
+        |       |<-(13)-- commitment_signed ------|       | Alice now knows Bob's sigs for Alice's commit tx
+        |       |                                 |       | Bob wasn't allowed to add his own PTLCs so Alice can finish up
+        |       |--(14)--- revoke_and_ack ------->|       | Alice is now committed, Bob can now safely forward
+        |       |                                 |       |
+        +-------+                                 +-------+
 
 ### `update_offer_ptlc`
 
