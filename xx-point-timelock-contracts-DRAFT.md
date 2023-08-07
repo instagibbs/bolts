@@ -186,13 +186,44 @@ Single-sig Adaptor, sync
         |       |                                 |       |
         +-------+                                 +-------+
 
-Pretty simple, pretty sure safe? I don't think Bob can send his own commitment until Alice has provided(1)'s presignature?
+Pretty simple, pretty sure safe? I don't think Bob can send his own `commitment_signed` until Alice has provided(1)'s presignature?
 If Bob sends commit tx sigs etc, Alice can take newest commit tx to chain, with no no success-path to receive an already existing
 PTLC Bob's forwarded.
 
 A TLV extension of `commitment_signed` to include the "self adaptor sigs" seems most straight forward here, no new message
 patterns to speak of.
 
+FIXME: How is this not broken? When Alice sends `commitment_signed` to Bob, Bob can now take his tx to chain,
+but Bob hasn't supplied his "Bob-offered PTLC"-Success case adaptor sigs(4), forcing an incoming timeout?
+
+        +-------+                                 +-------+
+        |       |                                 |       | Alice's turn
+        |       |--(1)---- update_offer_ptlc ---->|       | new amounts, lock info
+        |       |--(2)---- update_offer_ptlc ---->|       | new amounts, lock info
+        |       |--(X)---- done------------------>|       | Prompt Bob to send (4) adaptor sigs before Alice sends commit tx sig
+        |       |                                 |       |
+        |       |<-(X)--- b_o_btx_presign---------|       | Bob re-commits to all (4) PTLC-Success paths (must be before commit)
+        |       |                                 |       | 
+        |       |--(3)--- commitment_signed ----->|       | Alice's B_commit sig
+        |       |--(X)--- b_o_btx_sign----------->|       | Alice's full sig for (4) PTLC-timeouts back to Bob
+        |       |--(X)--- a_o_btx_presign-------->|       | Alice's adaptor sig for (2)
+        |       |--(X)--- a_o_atx_presign-------->|       | Alice re-commits to all (1) PTLC-S paths with adaptor sigs
+        |       |                                 |       |
+        |   A   |<-(4)--- revoke_and_ack ---------|   B   | Bob can broadcast latest state safely, revoke older
+        |       |<-(5)-- commitment_signed -------|       | Bob's A_commit sig
+        |       |<-(X)---b_o_atx_presign----------|       | Bob's adaptor signatures for (3)
+        |       |<-(X)---a_o_atx_sign-------------|       | Bob's full sig for (1) PTLC-timeouts back to Alice
+        |       |                                 |       |
+        |       |--(6)--- revoke_and_ack -------->|       | Alice is now committed, Bob can now safely forward
+        |       |                                 |       |
+        +-------+                                 +-------+
+
+2.5RTT. Making sure you refresh the remote tx's remote-offered PTLC-Sucess paths seems to be the rub. Don't think you can
+do another fair exchange on top, as you can't know the nonces beforehand to predict S`, the public point of the adaptor signature.
+
+Single-sig adaptor, sync, with APO?
+
+--------------------------------------------------------------------
 Single-sig Adaptor, *async*
         +-------+                                 +-------+
         |       |<-(0)---- update_offer_ptlc -----|       | new amounts, lock info
