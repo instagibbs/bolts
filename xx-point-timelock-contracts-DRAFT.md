@@ -279,16 +279,20 @@ sync with MuSig:
         +-------+                                 +-------+ Alice's turn
         |       |--(1)---- update_offer_ptlc ---->|       | new amounts, lock info
         |       |--(2)---- update_offer_ptlc ---->|       | new amounts, lock info
-        |       |--(3)--- commitment_signed ----->|       | Bob knows full local commit tx sig for Alice
+        |       |--(X)--- b_o_btx_nonce --------->|       | For all Bob-offered on Bob's tx (4)
+        |       |--(X)---- done------------------>|       | Prompt Bob to send (4) adaptor sigs before Alice sends commit tx sig
+        |       |                                 |       |
+        |       |<-(X)--- b_o_btx_nonce-----------|       | For all Bob-offered on Bob's tx (4)
+        |       |<-(X)--- b_o_btx_psig------------|       | Bob re-commits to all (4) PTLC-Success paths (must be before commit)
+        |       |                                 |       |
+        |       |--(3)--- commitment_signed ----->|       | Bob knows full local commit tx sig for Alice (and Alice knows PTLC-S (4))
         |       |--(4)--- a_o_btx_nonce --------->|       | For all Alice-offered on Bob's tx (2)
         |       |--(5)--- a_o_atx_nonce---------->|       | For all Alice-offered on Alice's tx (1)
-        |       |--(X)--- b_o_btx_nonce --------->|       | For all Bob-offered on Bob's tx (4)
         |       |--(X)--- b_o_atx_nonce---------->|       | For all Bob-offered on Alice's tx (3)
         |       |                                 |       |
         |       |<-(6)--- a_o_atx_nonce-----------|       | For all Alice-offered on Alice's tx (1)
         |       |<-(7)--- a_o_btx_nonce-----------|       | For all Alice-offered on Bob's tx (2)
         |       |<-(X)--- b_o_atx_nonce-----------|       | For all Bob-offered on Alice's tx (3)
-        |       |<-(X)--- b_o_btx_nonce-----------|       | For all Bob-offered on Bob's tx (4)
         |       |<-(8)--- a_o_atx_psig------------|       | Bob psigning Alice-offered PTLC in Alice tx (1)
         |       |<-(9)--- a_o_btx_psig------------|       | Bob psigning Alice-offered PTLC in Bob tx (2)
         |       |                                 |       |
@@ -298,7 +302,6 @@ sync with MuSig:
         |       |--(XX)-- b_o_btx_psig----------->|       | Alice psigning Bob-offered PTLC in Bob tx (3) 
         |       |                                 |       |
         |       |<-(XX)--- b_o_atx_psig-----------|       | Bob psigning Bob-offered PTLC in Alice tx (3)
-        |       |<-(XX)--- b_o_btx_psig-----------|       | Bob psigning Bob-offered PTLC in Bob tx (4)
         |   A   |<-(12)--- revoke_and_ack --------|   B   | All Alice-offered PTLCs locked in, new tx safe for Bob
         |       |<-(13)-- commitment_signed ------|       | Alice now knows Bob's sigs for Alice's commit tx
         |       |                                 |       | Bob wasn't allowed to add his own PTLCs so Alice can finish up
@@ -306,7 +309,7 @@ sync with MuSig:
         |       |                                 |       |
         +-------+                                 +-------+
 
-2.5RTT, let's play some ordering games...
+3.5RTT, let's play some ordering games...
 
 *handwave nonce presharing by sending a new nonce along with each psig*
         +-------+                                 +-------+ Alice's turn
