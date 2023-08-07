@@ -165,22 +165,58 @@ Also 2.5RTT. Is it safe? *receiver* of the PTLC needs to get psig from counter-p
 *{local, remote}_psigs sending pattern of receiver-first is complicated*
 
 TODO quickly sketch out the single-sig adaptor case
-Single-sig Adaptor
+
+Here are output labels because I get confused so often what things in BOLTs mean:
+(1) Alice-offered "offered PTLC" in Alice's tx
+(2) Alice-offered "received PTLC" in Bob's tx
+(3) Bob-offered "received PTLC" in Alice's tx
+(4) Bob-offered "offered PTLC" in Bob's tx
+
+Single-sig Adaptor, sync
         +-------+                                 +-------+
-        |       |<-(0)---- update_offer_ptlc -----|       | new amounts, lock info
         |       |                                 |       |
         |       |--(1)---- update_offer_ptlc ---->|       | new amounts, lock info
         |       |--(2)---- update_offer_ptlc ---->|       | new amounts, lock info
-        |       |--(3)--- commitment_signed ----->|       | Bob knows full local commit tx sig for Alice
+        |       |--(3)--- commitment_signed ----->|       | Alice's B_commit sig, Alice's presignatures for (1), (2), and full sig for (4)
         |       |                                 |       |
         |   A   |<-(4)--- revoke_and_ack ---------|   B   | Bob can broadcast latest state safely, revoke older
-        |       |<-(5)-- commitment_signed -------|       | Alice now knows Bob's sigs for Alice's commit tx
+        |       |<-(5)-- commitment_signed -------|       | Bob's A_commit sig, Bob's presignatures for (3), (4), and full sig for (1)
         |       |                                 |       |
         |       |--(6)--- revoke_and_ack -------->|       | Alice is now committed, Bob can now safely forward
         |       |                                 |       |
         +-------+                                 +-------+
 
+Pretty simple, pretty sure safe? I don't think Bob can send his own commitment until Alice has provided(1)'s presignature?
+If Bob sends commit tx sigs etc, Alice can take newest commit tx to chain, with no no success-path to receive an already existing
+PTLC you've forwarded.
 
+A TLV extension of `commitment_signed` to include the "self adaptor sigs" seems most straight forward here, no new message
+patterns to speak of.
+
+Single-sig Adaptor, *async*
+        +-------+                                 +-------+
+        |       |<-(0)---- update_offer_ptlc -----|       | new amounts, lock info
+        |       |                                 |       |
+        |       |--(1)---- update_offer_ptlc ---->|       | new amounts, lock info
+        |       |--(2)---- update_offer_ptlc ---->|       | new amounts, lock info
+        |       |--(3)--- commitment_signed ----->|       | Alice's B_commit sig, Alice's presignatures for (2) and full sig for (4)
+        |       |                                 |       |
+        |   A   |<-(4)--- revoke_and_ack ---------|   B   | Bob can broadcast local latest state safely, revoke older
+        |       |<-(5)--- self_ptlc_plz ----------|       | Bob says he's done, please give your local PTLC presignatures
+        |       |                                 |       |
+        |       |--(6)--- self_ptlc_signed ------>|       | Alice gives Bob her local presignatures, Bob can now give commit sig...
+        |       |                                 |       |
+        |       |<-(7)-- commitment_signed -------|       | Bob's A_commit sig, Bob's presignatures for (3) and full sig for (1)
+        |       |                                 |       |
+        |       |--(8)--- revoke_and_ack -------->|       | Alice is now committed, Bob can now safely forward
+        |       |                                 |       |
+        +-------+                                 +-------+
+
+2.5 RTT? Bob can't safely send commitment_signed until he has presignatures for all existing PTLCs, but structure
+needs to be fixed, so Bob needs to signal Alice that he's done updating. Or for 1.5RTT  Alice has to start shooting off presingatures
+and Bob sends commitment_signed once he gets the thing he wants. O(n^2) adaptor sigs seems uhhh not great.
+
+APO fixes this.
 
 ### `update_offer_ptlc`
 
