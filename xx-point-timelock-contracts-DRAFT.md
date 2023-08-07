@@ -252,6 +252,59 @@ sync with MuSig:
         |       |                                 |       |
         +-------+                                 +-------+
 
+2.5RTT, let's play some ordering games...
+
+*handwave nonce presharing by sending a new nonce along with each psig*
+        +-------+                                 +-------+ Alice's turn
+        |       |--(1)---- update_offer_ptlc ---->|       | new amounts, lock info
+        |       |--(2)---- update_offer_ptlc ---->|       | new amounts, lock info
+        |       |--(3)--- commitment_signed ----->|       | Bob knows full local commit tx sig for Alice
+        |       |                                 |       |
+        |       |<-(8)--- a_o_atx_psig------------|       | Bob psigning Alice-offered PTLC in Alice tx (1)
+        |       |<-(9)--- a_o_btx_psig------------|       | Bob psigning Alice-offered PTLC in Bob tx (2)
+        |       |                                 |       |
+        |       |--(10)-- a_o_atx_psig----------->|       | Alice psigning Alice-offered PTLC in Alice tx (1)
+        |       |--(11)-- a_o_btx_psig----------->|       | Alice psigning Alice-offered PTLC in Bob tx (2)
+        |       |--(XX)-- b_o_atx_psig----------->|       | Alice psigning Bob-offered PTLC in Alice tx (3) 
+        |       |--(XX)-- b_o_btx_psig----------->|       | Alice psigning Bob-offered PTLC in Bob tx (3) 
+        |       |                                 |       |
+        |       |<-(XX)--- b_o_atx_psig-----------|       | Bob psigning Bob-offered PTLC in Alice tx (3)
+        |       |<-(XX)--- b_o_btx_psig-----------|       | Bob psigning Bob-offered PTLC in Bob tx (4)
+        |   A   |<-(12)--- revoke_and_ack --------|   B   | All Alice-offered PTLCs locked in, new tx safe for Bob
+        |       |<-(13)-- commitment_signed ------|       | Alice now knows Bob's sigs for Alice's commit tx
+        |       |                                 |       | Bob wasn't allowed to add his own PTLCs so Alice can finish up
+        |       |--(14)--- revoke_and_ack ------->|       | Alice is now committed, Bob can now safely forward
+        |       |                                 |       |
+        +-------+                                 +-------+
+
+can we get rid of a RTT by pushing psigs around?
+        +-------+                                 +-------+ Alice's turn
+        |       |--(1)---- update_offer_ptlc ---->|       | new amounts, lock info
+        |       |--(2)---- update_offer_ptlc ---->|       | new amounts, lock info
+        |       |--(3)--- commitment_signed ----->|       | Bob knows full local commit tx sig for Alice
+        |       |--(XX)-- b_o_atx_psig----------->|       | Alice psigning Bob-offered PTLC in Alice tx (3) 
+        |       |--(XX)-- b_o_btx_psig----------->|       | Alice psigning Bob-offered PTLC in Bob tx (3) 
+        |       |                                 |       |
+        |       |<-(8)--- a_o_atx_psig------------|       | Bob psigning Alice-offered PTLC in Alice tx (1)
+        |       |<-(9)--- a_o_btx_psig------------|       | Bob psigning Alice-offered PTLC in Bob tx (2)
+        |       |                                 |       |
+        |       |<-(XX)--- b_o_atx_psig-----------|       | Bob psigning Bob-offered PTLC in Alice tx (3)
+        |       |<-(XX)--- b_o_btx_psig-----------|       | Bob psigning Bob-offered PTLC in Bob tx (4)
+        |   A   |<-(12)--- revoke_and_ack --------|   B   | All Alice-offered PTLCs locked in, new tx safe for Bob
+        |       |<-(13)-- commitment_signed ------|       | Alice now knows Bob's sigs for Alice's commit tx
+        |       |  ^^^ nope                       |       | Bob wasn't allowed to add his own PTLCs so Alice can finish up
+        |       |--(10)-- a_o_atx_psig----------->|       | Alice psigning Alice-offered PTLC in Alice tx (1)
+        |       |--(11)-- a_o_btx_psig----------->|       | Alice psigning Alice-offered PTLC in Bob tx (2)
+        |       |--(14)--- revoke_and_ack ------->|       | Alice is now committed, Bob can now safely forward
+        |       |                                 |       |
+        +-------+                                 +-------+
+
+Again, Bob can't send `commitment_signed` until he has *all* Alice-offered PTLCs on Alice tx, otherwise
+Alice can go to chain with her tx, invalidating his incoming PTLCs he's already forwarded!
+
+Think MuSig/sync is stuck with 2.5RTT fundamentally.
+
+
 ### `update_offer_ptlc`
 
 1. type: 128.1 (`update_offer_ptlc`)
