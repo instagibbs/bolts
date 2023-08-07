@@ -188,7 +188,7 @@ Single-sig Adaptor, sync
 
 Pretty simple, pretty sure safe? I don't think Bob can send his own commitment until Alice has provided(1)'s presignature?
 If Bob sends commit tx sigs etc, Alice can take newest commit tx to chain, with no no success-path to receive an already existing
-PTLC you've forwarded.
+PTLC Bob's forwarded.
 
 A TLV extension of `commitment_signed` to include the "self adaptor sigs" seems most straight forward here, no new message
 patterns to speak of.
