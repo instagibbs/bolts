@@ -277,12 +277,14 @@ Let's try MuSig again...
 sync with MuSig:
 
         +-------+                                 +-------+ Alice's turn
+        |       |<-(X)--- b_o_btx_nonce-----------|       | For all Bob-offered on Bob's tx (4)
+        |       |                                 |       |
         |       |--(1)---- update_offer_ptlc ---->|       | new amounts, lock info
         |       |--(2)---- update_offer_ptlc ---->|       | new amounts, lock info
         |       |--(X)--- b_o_btx_nonce --------->|       | For all Bob-offered on Bob's tx (4)
+        |       |--(XX)-- b_o_btx_psig----------->|       | Alice psigning Bob-offered PTLC in Bob tx (4) 
         |       |--(X)---- done------------------>|       | Prompt Bob to send (4) adaptor sigs before Alice sends commit tx sig
         |       |                                 |       |
-        |       |<-(X)--- b_o_btx_nonce-----------|       | For all Bob-offered on Bob's tx (4)
         |       |<-(X)--- b_o_btx_psig------------|       | Bob re-commits to all (4) PTLC-Success paths (must be before commit)
         |       |                                 |       |
         |       |--(3)--- commitment_signed ----->|       | Bob knows full local commit tx sig for Alice (and Alice knows PTLC-S (4))
@@ -299,7 +301,6 @@ sync with MuSig:
         |       |--(10)-- a_o_atx_psig----------->|       | Alice psigning Alice-offered PTLC in Alice tx (1)
         |       |--(11)-- a_o_btx_psig----------->|       | Alice psigning Alice-offered PTLC in Bob tx (2)
         |       |--(XX)-- b_o_atx_psig----------->|       | Alice psigning Bob-offered PTLC in Alice tx (3) 
-        |       |--(XX)-- b_o_btx_psig----------->|       | Alice psigning Bob-offered PTLC in Bob tx (3) 
         |       |                                 |       |
         |       |<-(XX)--- b_o_atx_psig-----------|       | Bob psigning Bob-offered PTLC in Alice tx (3)
         |   A   |<-(12)--- revoke_and_ack --------|   B   | All Alice-offered PTLCs locked in, new tx safe for Bob
@@ -359,15 +360,22 @@ can we get rid of a RTT by pushing psigs around?
 Again, Bob can't send `commitment_signed` until he has *all* Alice-offered PTLCs on Alice tx, otherwise
 Alice can go to chain with her tx, invalidating his incoming PTLCs he's already forwarded!
 
-Think MuSig/sync is stuck with 2.5RTT fundamentally.
+Think MuSig/sync is stuck with ~2.5RTT~ 3.5RTT fundamentally. (see further above, all commitment_signed must be preceded by
+the transaction owner's PTLC-S case (1) or (4)
 
 Let's try *async* MuSig, handwave away nonces like before
-
+FIX
         +-------+                                 +-------+ Alice's turn
         |       |<-(0)---- update_offer_ptlc -----|       | new amounts, lock info
         |       |                                 |       |
         |       |--(1)---- update_offer_ptlc ---->|       | new amounts, lock info
         |       |--(2)---- update_offer_ptlc ---->|       | new amounts, lock info
+        |       |--(X)--- b_o_btx_nonce --------->|       | For all Bob-offered on Bob's tx (4)
+        |       |--(X)---- done------------------>|       | Prompt Bob to send (4) adaptor sigs before Alice sends commit tx sig
+        |       |                                 |       |
+        |       |<-(X)--- b_o_btx_nonce-----------|       | For all Bob-offered on Bob's tx (4)
+        |       |<-(X)--- b_o_btx_psig------------|       | Bob re-commits to all (4) PTLC-Success paths (must be before commit)
+        |       |                                 |       |
         |       |--(3)--- commitment_signed ----->|       | Bob knows full local commit tx sig for Alice
         |       |                                 |       |
         |       |<-(9)--- a_o_btx_psig------------|       | Bob psigning Alice-offered PTLC in Bob tx (2)
