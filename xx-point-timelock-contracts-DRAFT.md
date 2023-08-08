@@ -161,8 +161,8 @@ Async
         |       |                                 |       |
         +-------+                                 +-------+
 
-Also 2.5RTT. Is it safe? *receiver* of the PTLC needs to get psig from counter-party first
-*{local, remote}_psigs sending pattern of receiver-first is complicated*
+Wrong ~Also 2.5RTT. Is it safe? *receiver* of the PTLC needs to get psig from counter-party first
+*{local, remote}_psigs sending pattern of receiver-first is complicated*~
 
 TODO quickly sketch out the single-sig adaptor case
 
