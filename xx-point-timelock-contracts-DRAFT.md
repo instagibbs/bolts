@@ -238,6 +238,8 @@ Single-sig adaptor, sync, with APO?
         |       |                                 |       |
         +-------+                                 +-------+
 
+1.5RTT
+
 APO or APOAS? Async seems the same with APO.
 
 --------------------------------------------------------------------
