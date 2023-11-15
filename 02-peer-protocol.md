@@ -212,6 +212,7 @@ The currently defined basic types are:
   - `option_static_remotekey` (bit 12)
   - `option_anchor_outputs` and `option_static_remotekey` (bits 20 and 12)
   - `option_anchors_zero_fee_htlc_tx` and `option_static_remotekey` (bits 22 and 12)
+  - `option_commit_zero_fee` and `option_static_remotekey` (bits 52 and 12)
 
 Each basic type has the following variations allowed:
   - `option_scid_alias` (bit 46)
@@ -246,9 +247,12 @@ The sending node:
     - if `announce_channel` is `true` (not `0`):
       - MUST NOT send `channel_type` with the `option_scid_alias` bit set.
 
+If `option_commit_zero_fee` is negotiated the sending node MUST:
+  - set `feerate_per_kw` to zero
+
 The sending node SHOULD:
   - set `to_self_delay` sufficient to ensure the sender can irreversibly spend a commitment transaction output, in case of misbehavior by the receiver.
-  - set `feerate_per_kw` to at least the rate it estimates would cause the transaction to be immediately included in a block.
+  - set `feerate_per_kw` to at least the rate it estimates would cause the transaction to be immediately included in a block if `option_commit_zero_fee` not negotiated.
   - set `dust_limit_satoshis` to a sufficient value to allow commitment transactions to propagate through the Bitcoin network.
   - set `htlc_minimum_msat` to the minimum value HTLC it's willing to accept from this peer.
 
@@ -435,7 +439,10 @@ Both peers:
   - if `channel_type` was present in both `open_channel` and `accept_channel`:
     - This is the `channel_type` (they must be equal, required above)
   - otherwise:
-    - if `option_anchors_zero_fee_htlc_tx` was negotiated:
+    - if `option_commit_zero_fee` was negotiated:
+      - the `channel_type` is `option_commit_zero_fee` and `option_static_remotekey` (bits 52 and 12)
+      - fees in all pre-signed transactions are zero
+    - otherwise if `option_anchors_zero_fee_htlc_tx` was negotiated:
       - the `channel_type` is `option_anchors_zero_fee_htlc_tx` and `option_static_remotekey` (bits 22 and 12)
     - otherwise, if `option_anchor_outputs` was negotiated:
       - the `channel_type` is `option_anchor_outputs` and `option_static_remotekey` (bits 20 and 12)
@@ -459,15 +466,16 @@ The recipient:
 
 #### Rationale
 
-We decide on `option_static_remotekey`, `option_anchor_outputs` or
-`option_anchors_zero_fee_htlc_tx` at this point when we first have to generate
+We decide on `option_static_remotekey`, `option_anchor_outputs`, `option_commit_zero_fee`,
+or `option_anchors_zero_fee_htlc_tx` at this point when we first have to generate
 the commitment transaction. The feature bits that were communicated in the
 `init` message exchange for the current connection determine the channel
 commitment format for the total lifetime of the channel. Even if a later
 reconnection does not negotiate this parameter, this channel will continue to
-use `option_static_remotekey`, `option_anchor_outputs` or
+use `option_static_remotekey`, `option_anchor_outputs`, `option_commit_zero_fee` or
 `option_anchors_zero_fee_htlc_tx`; we don't support "downgrading".
 
+FIXME pamp `option_commit_zero_fee`
 `option_anchors_zero_fee_htlc_tx` is considered superior to
 `option_anchor_outputs`, which again is considered superior to
 `option_static_remotekey`, and the superior one is favored if more than one
@@ -1012,8 +1020,8 @@ A node:
 The `max_dust_htlc_exposure_msat` is an upper bound on the trimmed balance from
 dust exposure. The exact value used is a matter of node policy.
 
-For channels that don't use `option_anchors_zero_fee_htlc_tx`, an increase of
-the `feerate_per_kw` may trim multiple htlcs from commitment transactions,
+For channels that don't use `option_commit_zero_fee` or `option_anchors_zero_fee_htlc_tx`,
+an increase of the `feerate_per_kw` may trim multiple htlcs from commitment transactions,
 which could create a large increase in dust exposure.
 
 ### Adding an HTLC: `update_add_htlc`
@@ -1380,7 +1388,7 @@ The node _not responsible_ for paying the Bitcoin fee:
   - MUST NOT send `update_fee`.
 
 A sending node:
-  - if `option_anchors_zero_fee_htlc_tx` was not negotiated:
+  - if `option_commit_zero_fee` and `option_anchors_zero_fee_htlc_tx` was not negotiated:
     - if the `update_fee` increases `feerate_per_kw`:
       - if the dust balance of the remote transaction at the updated `feerate_per_kw` is greater than `max_dust_htlc_exposure_msat`:
         - MAY NOT send `update_fee`
@@ -1390,6 +1398,9 @@ A sending node:
         - MAY fail the channel
 
 A receiving node:
+  - if `option_commit_zero_fee` was negotiated:
+    - SHOULD send a `warning` and close the connection, or send an
+      `error` and fail the channel.
   - if the `update_fee` is too low for timely processing, OR is unreasonably large:
     - MUST send a `warning` and close the connection, or send an
       `error` and fail the channel.
@@ -1434,6 +1445,9 @@ If on-chain fees increase while commitments contain many HTLCs that will
 be trimmed at the updated feerate, this could overflow the configured
 `max_dust_htlc_exposure_msat`. Whether to close the channel preemptively
 or not is left as a matter of node policy.
+
+`option_commit_zero_fee` needs no `update_fee` message, as commitment
+transactions have zero fees.
 
 ## Message Retransmission
 

@@ -49,10 +49,14 @@ The Context column decodes as follows:
 | 46/47 | `option_scid_alias`               | Supply channel aliases for routing                        | IN       |                           | [BOLT #2][bolt02-channel-ready]                                       |
 | 48/49 | `option_payment_metadata`         | Payment metadata in tlv record                            | 9        |                           | [BOLT #11](11-payment-encoding.md#tagged-fields)                      |
 | 50/51 | `option_zeroconf`                 | Understands zeroconf channel types                        | IN       | `option_scid_alias`       | [BOLT #2][bolt02-channel-ready]                                       |
+| 52/53 | `option_commit_zero_fee`          | Zero-fee commitment transactions                          | IN       | `option_static_remotekey` | [BOLT #3][bolt03-htlc-tx], [lightning-dev][ml-sighash-single-harmful] |
 
 ## Definitions
 
 We define `option_anchors` as `option_anchor_outputs || option_anchors_zero_fee_htlc_tx`.
+
+Note that for the purposes of the spec, `option_commit_zero_fee` does *not* imply `option_anchors`,
+although it uses ephemeral anchors.
 
 ## Requirements
 

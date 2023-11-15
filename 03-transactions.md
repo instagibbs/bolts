@@ -12,6 +12,7 @@ This details the exact format of on-chain transactions, which both sides need to
         * [Commitment Transaction Outputs](#commitment-transaction-outputs)
           * [`to_local` Output](#to_local-output)
           * [`to_remote` Output](#to_remote-output)
+          * [`to_anchor` Output](#to_anchor-option-commit-zero-fee)
           * [`to_local_anchor` and `to_remote_anchor`](#to_local_anchor-and-to_remote_anchor-output-option_anchor_outputs)
           * [Offered HTLC Outputs](#offered-htlc-outputs)
           * [Received HTLC Outputs](#received-htlc-outputs)
@@ -76,7 +77,7 @@ A `<>` designates an empty vector as required for compliance with MINIMALIF-stan
 
 ## Commitment Transaction
 
-* version: 2
+* version: 3 if `option_commit_zero_fee` is negotiated, otherwise 2
 * locktime: upper 8 bits are 0x20, lower 24 bits are the lower 24 bits of the obscured commitment number
 * txin count: 1
    * `txin[0]` outpoint: `txid` and `output_index` from `funding_created` message
@@ -137,6 +138,23 @@ The output is spent by an input with `nSequence` field set to `1` and witness:
 
 Otherwise, this output is a simple P2WPKH to `remotepubkey`. Note: the remote's commitment transaction uses your `localpubkey` for their
 `to_remote` output to yourself.
+
+Note the latter condition applies for `option_commit_zero_fee`, since `to_remote` outputs can be used directly for cpfp.
+
+#### `to_anchor` Output (option_commit_zero_fee)
+
+This output can be spent by the local and remote nodes respectively to provide incentive to mine the transaction, using child-pays-for-parent. It's a single anchor, always added. This output is an ephemeral anchor, which is a key-less output efficiently spendable by anyone, and is required to be spent
+by Bitcoin node mempool policies.
+
+The outputs' script is simply:
+
+    OP_1 <0x4e73>
+
+Which is spendable with no `scriptSig` or witness data. This saves roughly 113 weight units during spending
+time over `to_local_anchor` and `to_remote_anchor` on top of the reduction in output script size.
+
+The amount of the output is the accumulated "trimmed" sats for this commitment transaction to ensure the commitment
+transaction remains 0-fee.
 
 #### `to_local_anchor` and `to_remote_anchor` Output (option_anchors)
 
@@ -283,6 +301,9 @@ to the commitment transaction fee. For HTLCs, it needs to be taken into
 account that the second-stage HTLC transaction may also be below the
 limit.
 
+Note that this summed value of a;; trimmed outputs is put directly into the ephemeral anchor
+when `option_commit_zero_fee` is negotiated.
+
 #### Requirements
 
 The base fee and anchor output values:
@@ -320,7 +341,7 @@ less than `dust_limit_satoshis` set by the transaction owner:
 
 These HTLC transactions are almost identical, except the HTLC-timeout transaction is timelocked. Both HTLC-timeout/HTLC-success transactions can be spent by a valid penalty transaction.
 
-* version: 2
+* version: 3 if `option_commit_zero_fee` is negotiated, otherwise 2
 * locktime: `0` for HTLC-success, `cltv_expiry` for HTLC-timeout
 * txin count: 1
    * `txin[0]` outpoint: `txid` of the commitment transaction and `output_index` of the matching HTLC output for the HTLC transaction
@@ -346,6 +367,10 @@ The witness script for the output is:
     OP_CHECKSIG
 
 To spend this via penalty, the remote node uses a witness stack `<revocationsig> 1`, and to collect the output, the local node uses an input with nSequence `to_self_delay` and a witness stack `<local_delayedsig> 0`.
+
+With `option_commit_zero_fee`, the commitment transaction can be spent along with any pre-signed HTLC transaction, provided
+the requisite fees are attached to the HTLC transaction. This is likely inadvisable in a scenario with HTLC-Timelock path due
+to the inherent contention in utxo ownership.
 
 ## Closing Transaction
 
@@ -409,6 +434,7 @@ Thus, a simplified formula for *expected weight* is used, which assumes:
 * There are a small number of outputs (thus 1 byte to count them).
 * There are always both a `to_local` output and a `to_remote` output.
 * (if `option_anchors`) there are always both a `to_local_anchor` and `to_remote_anchor` output.
+* (if `option_commit_zero_fee`) there is always a `to_anchor` output.
 
 This yields the following *expected weights* (details of the computation in [Appendix A](#appendix-a-expected-weights)):
 
@@ -418,6 +444,9 @@ This yields the following *expected weights* (details of the computation in [App
     HTLC-timeout weight (option_anchors): 666
     HTLC-success weight (no option_anchors): 703
     HTLC-success weight (option_anchors): 706
+
+For comparison only, here are the expected weights for zero fee commitment transactions:
+    Commitment weight (option_commit_zero_fee): 784 + 172 * num-untrimmed-htlc-outputs
 
 Note the reference to the "base fee" for a commitment transaction in the requirements below, which is what the funder pays. The actual fee may be higher than the amount calculated here, due to rounding and trimmed outputs.
 
@@ -436,11 +465,13 @@ The fee for an HTLC-success transaction:
     1. Multiply `feerate_per_kw` by 703 (706 if `option_anchor_outputs` applies) and divide by 1000 (rounding down).
 
 The base fee for a commitment transaction:
-  - MUST be calculated to match:
+  - If `option_commit_zero_fee` applies:
+    1. MUST be 0.
+  - Otherwise MUST be calculated to match:
     1. Start with `weight` = 724 (1124 if `option_anchors` applies).
-    2. For each committed HTLC, if that output is not trimmed as specified in
+    1. For each committed HTLC, if that output is not trimmed as specified in
     [Trimmed Outputs](#trimmed-outputs), add 172 to `weight`.
-    3. Multiply `feerate_per_kw` by `weight`, divide by 1000 (rounding down).
+    1. Multiply `feerate_per_kw` by `weight`, divide by 1000 (rounding down).
 
 #### Example
 
@@ -894,6 +925,11 @@ The *expected weight* of a commitment transaction is calculated as follows:
 		- var_int: 1 byte (pk_script length)
 		- pk_script (p2wsh): 34 bytes
 
+    output_ephemeral_anchor (option_commit_zero_fee): 13 bytes
+        - value: 8 bytes
+        - var_int: 1 byte (pk_script length)
+        - pk_script (p2wsh): 4 bytes
+
     htlc_output: 43 bytes
 		- value: 8 bytes
 		- var_int: 1 byte (pk_script length)
@@ -931,10 +967,26 @@ The *expected weight* of a commitment transaction is calculated as follows:
 			....htlc_output's...
 		- lock_time: 4 bytes
 
+	 commitment_transaction (option_commit_zero_fee): 140 + 43 * num-htlc-outputs bytes
+		- version: 4 bytes
+		- witness_header <---- part of the witness data
+		- count_tx_in: 1 byte
+		- tx_in: 41 bytes
+			funding_input
+		- count_tx_out: 3 byte
+		- tx_out: 87 + 43 * num-htlc-outputs bytes
+			output_paying_to_remote,
+			output_paying_to_local,
+			output_ephemeral_anchor,
+			....htlc_output's...
+		- lock_time: 4 bytes
+
+
 Multiplying non-witness data by 4 results in a weight of:
 
 	// 500 + 172 * num-htlc-outputs weight (no option_anchors)
 	// 900 + 172 * num-htlc-outputs weight (option_anchors)
+	// 560 + 172 * num-htlc-outputs weight (option_commit_zero_fee)
 	commitment_transaction_weight = 4 * commitment_transaction
 
 	// 224 weight
@@ -942,6 +994,7 @@ Multiplying non-witness data by 4 results in a weight of:
 
 	overall_weight (no option_anchors) = 500 + 172 * num-htlc-outputs + 224 weight
 	overall_weight (option_anchors) = 900 + 172 * num-htlc-outputs + 224 weight
+	overall_weight (option_commit_zero_fee) = 560 + 172 * num-htlc-outputs + 224 weight
 
 ## Expected Weight of HTLC-timeout and HTLC-success Transactions
 

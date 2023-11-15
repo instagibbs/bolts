@@ -105,6 +105,10 @@ the *remote node* in return for a payment preimage.
 6. _remote node's offered HTLCs_: Zero or more pending payments (*HTLCs*), to
 pay the *local node* in return for a payment preimage.
 
+with an additional output type possible:
+
+7. _ephemeral anchor output_: one output paying to a trivially spendable pubkey
+
 To incentivize the local and remote nodes to cooperate, an `OP_CHECKSEQUENCEVERIFY`
 relative timeout encumbers the *local node's outputs* (in the *local node's
 commitment transaction*) and the *remote node's outputs* (in the *remote node's
@@ -148,7 +152,7 @@ A node:
         - otherwise:
           - MUST broadcast the *last commitment transaction*, for which it has a
           signature, to perform a *unilateral close*.
-          - MUST spend any `to_local_anchor` output, providing sufficient fees as incentive to include the commitment transaction in a block.
+          - MUST spend any `to_local_anchor` or `to_anchor` output, providing sufficient fees as incentive to include the commitment transaction in a block.
           Special care must be taken when spending to a third-party, because this re-introduces the vulnerability that was
           addressed by adding the CSV delay to the non-anchor outputs.
           - SHOULD use [replace-by-fee](https://github.com/bitcoin/bips/blob/master/bip-0125.mediawiki) or other mechanism on the spending transaction if it proves insufficient for timely inclusion in a block.
@@ -517,7 +521,7 @@ A local node:
   using the revocation private key.
   - SHOULD extract the payment preimage from the transaction input witness, if
   it's not already known.
-  - if `option_anchors` applies:
+  - if `option_anchors` or `option_commit_zero_fee` applies:
     - MAY use a single transaction to *resolve* all the outputs.
     - if confirmation doesn't happen before reaching `security_delay` blocks from
   expiry:
@@ -590,7 +594,7 @@ Note: even if the `to_remote` output is not swept, the resulting
 
 # Generation of HTLC Transactions
 
-If `option_anchors` does not apply to the commitment transaction, then
+If `option_anchors` and `option_commit_zero_fee` does not apply to the commitment transaction, then
 HTLC-timeout and HTLC-success transactions are complete transactions with
 (hopefully!) reasonable fees and must be used directly.
 
@@ -599,7 +603,7 @@ HTLC signatures received from the peer, as this allows HTLC transactions to be c
 other transactions.  The local signature MUST use `SIGHASH_ALL`, otherwise
 anyone can attach additional inputs and outputs to the tx.
 
-If `option_anchors_zero_fee_htlc_tx` applies, then the HTLC-timeout and
+If `option_anchors_zero_fee_htlc_tx` or `option_commit_zero_fee` applies, then the HTLC-timeout and
 HTLC-success transactions are signed with the input and output having the same
 value. This means they have a zero fee and MUST be combined with other inputs
 to arrive at a reasonable fee.
@@ -612,12 +616,12 @@ commitment transaction:
     - SHOULD combine it with inputs contributing sufficient fee to ensure
       timely inclusion in a block.
     - MAY combine it with other transactions.
-  2. if `option_anchors_zero_fee_htlc_tx` applies:
+  2. if `option_anchors_zero_fee_htlc_tx` or `option_commit_zero_fee` applies:
     - MUST combine it with inputs contributing sufficient fee to ensure timely
       inclusion in a block.
     - MAY combine it with other transactions.
 
-Note that `option_anchors_zero_fee_htlc_tx` has a stronger requirement for
+Note that `option_anchors_zero_fee_htlc_tx` and `option_commit_zero_fee` has a stronger requirement for
 adding inputs to the final transactions than `option_anchor_outputs`, since the
 HTLC-success and HTLC-timeout transactions won't propagate without additional
 inputs added.
