@@ -301,7 +301,7 @@ to the commitment transaction fee. For HTLCs, it needs to be taken into
 account that the second-stage HTLC transaction may also be below the
 limit.
 
-Note that this summed value of a;; trimmed outputs is put directly into the ephemeral anchor
+Note that this summed value of all trimmed outputs is put directly into the ephemeral anchor
 when `option_commit_zero_fee` is negotiated.
 
 #### Requirements
@@ -351,7 +351,7 @@ These HTLC transactions are almost identical, except the HTLC-timeout transactio
 * txout count: 1
    * `txout[0]` amount: the HTLC `amount_msat` divided by 1000 (rounding down) minus fees in satoshis (see [Fee Calculation](#fee-calculation))
    * `txout[0]` script: version-0 P2WSH with witness script as shown below
-* if `option_anchors` applies to this commitment transaction, `SIGHASH_SINGLE|SIGHASH_ANYONECANPAY` is used as described in [BOLT #5](05-onchain.md#generation-of-htlc-transactions).
+* if `option_anchors` or `option_commit_zero_fee` applies to this commitment transaction, `SIGHASH_SINGLE|SIGHASH_ANYONECANPAY` is used as described in [BOLT #5](05-onchain.md#generation-of-htlc-transactions).
 
 The witness script for the output is:
 
