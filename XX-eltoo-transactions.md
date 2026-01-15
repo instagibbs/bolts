@@ -14,7 +14,7 @@ This details the exact format of on-chain transactions, which both sides need to
         * [Settlement Transaction Outputs](#settlement-transaction-outputs)
           * [`to_node` Output](#to_node-output)
           * [HTLC Outputs](#htlc-outputs)
-          * [Ephemeral Anchor Output](#anchor-output)
+          * [Pay-To-Anchor (P2A) Output](#pay-to-anchor-p2a-output)
         * [Trimmed Outputs](#trimmed-outputs)
 	* [Closing Transaction](#closing-transaction)
     * [Fees](#fees)
@@ -31,19 +31,27 @@ This details the exact format of on-chain transactions, which both sides need to
 The rest of the document presumes a specific set of mempool policy enhancements and
 consensus changes.
 
-roughly detailed [here](https://gist.github.com/instagibbs/b3095752d6289ab52166c04df55c1c19).
-
 The consensus assumptions are:
 
-1. These transactions assume [BIP118](https://github.com/bitcoin/bips/blob/master/bip-0118.mediawiki) in its current written form.
+1. These transactions assume [BIP118](https://github.com/bitcoin/bips/blob/master/bip-0118.mediawiki) (SIGHASH_ANYPREVOUT) in its current written form.
+1. Annex data is allowed, up to at least 33 bytes worth for our purposes.
 
 The policy assumptions are:
 
-1. Package relay is implemented and deployed, as per [this link](https://github.com/bitcoin/bips/pull/1382)
-1. [Package RBF](https://github.com/bitcoin/bitcoin/pull/25038) is adopted for rule#3 pinning mitigation.
-1. [Ephemeral Anchors](https://github.com/bitcoin/bitcoin/pull/26403) are implemented.
-1. Annex data is allowed, up to at least 33 bytes worth for our purposes. [Should update to this format.](https://github.com/bitcoin-inquisition/bitcoin/pull/9)
-1. Mitigation for ACP-style pinning on APO (how to stop 0-value junk inputs from being added to APO transactions?)
+1. [TRUC Transactions (BIP431)](https://github.com/bitcoin/bips/blob/master/bip-0431.mediawiki): All update, settlement, and closing transactions use `nVersion=3` to signal TRUC (Topologically Restricted Until Confirmation). TRUC transactions enforce:
+   - A cluster limit of 2 (1 unconfirmed parent, 1 unconfirmed child)
+   - Maximum transaction size of 10,000 vB
+   - Maximum child transaction size of 1,000 vB
+   - Implicit replaceability signaling (no BIP125 flag required)
+   - Zero-fee parent transactions are permitted when packaged with a fee-paying child
+1. [Package Relay](https://github.com/bitcoin/bitcoin/blob/master/doc/policy/packages.md): 1-parent-1-child (1p1c) package relay is implemented and deployed, allowing zero-fee TRUC parent transactions to propagate with a fee-paying child.
+1. [Package RBF](https://github.com/bitcoin/bitcoin/pull/25038): Package-level replace-by-fee is adopted for transaction pinning mitigation.
+1. [Pay-To-Anchor (P2A)](https://github.com/bitcoin/bitcoin/pull/30352): Ephemeral anchor outputs use the P2A output type (`OP_1 <0x4e73>`), which is a keyless, anyone-can-spend witness v1 output. P2A outputs:
+   - Require no witness data to spend (empty witness stack)
+   - Have a dust threshold of 240 satoshis
+   - Are standard as of Bitcoin Core 28.0
+1. [Ephemeral Dust](https://github.com/bitcoin/bitcoin/pull/30239): Zero-value P2A outputs are permitted in TRUC transactions, provided the output is spent by a child transaction in the same package. This allows trimmed output value to flow to miner fees via CPFP.
+1. Mitigation for ACP-style pinning on APO (preventing 0-value junk inputs from being added to APO transactions).
 
 # Transactions
 
@@ -65,7 +73,7 @@ The same rules for output ordering from [BOLT03](03-transactions.md#transaction-
 
 ## Use of Taproot
 
-All outputs except ephemeral anchors are pay-to-taproot<sup>[BIP341](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#constructing-and-spending-taproot-outputs)</sup> (P2TR) outputs. We are ommitting all non-script related witness stack items for brevity such as control block, inner pubkeys, et al.
+All outputs except P2A anchor outputs are pay-to-taproot<sup>[BIP341](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#constructing-and-spending-taproot-outputs)</sup> (P2TR) outputs. We are ommitting all non-script related witness stack items for brevity such as control block, inner pubkeys, et al.
 
 A `<>` designates an empty vector as required for compliance with [BIP342](https://github.com/bitcoin/bips/blob/master/bip-0342.mediawiki)
 
@@ -122,7 +130,7 @@ with the policy of `pk(1)`
      * `signature_for_inner_pubkey`
 * txout count: 2
    * `txout[0]` amount: 0
-   * `txout[0]` script: `OP_2` (ephemeral anchor)
+   * `txout[0]` script: P2A (`OP_1 <0x4e73>`, witness v1 program, `bc1pfeessrawgf`)
    * `txout[1]` amount: the channel capacity
    * `txout[1]` script: `tr(aggregated_key, {EXPR_UPDATE(n+1), EXPR_SETTLE(n)})`
 
@@ -165,8 +173,8 @@ The "state-masking offset" is used to hide the total number of updates in the ch
 blockchain observers. Future versions of this spec can introduce a randomized negotiation
 of this value.
 
-The ephemeral anchor will always be of value 0(and the other non-0), so output sorting will result in
-the ephemeral anchor output being first.
+The P2A anchor will always be of value 0 (and the state output non-0), so output sorting will result in
+the P2A anchor output being first.
 
 ## Settlement Transaction
 
@@ -210,7 +218,8 @@ There are `N` copies of this output, one for each channel participant and their 
 
 Ideally, we could directly use a raw script to allow maximal flexibility, but we do not want to ensure
 that all output scripts given are mempool-standard. We do not need one block relative timelock in scripts
-since we can no longer be pinned by package sizes(bip125 rule#3) or package limits thanks to V3 transactions and ephemeral anchors.
+since we can no longer be pinned by package sizes (BIP125 rule #3) or package limits thanks to TRUC
+transactions (BIP431) and P2A anchors.
 
 #### HTLC Outputs
 
@@ -248,26 +257,37 @@ And the offerer via:
 
 on an otherwise valid transaction.
 
-#### Ephemeral Anchor Output
+#### Pay-To-Anchor (P2A) Output
 
-A single shared anchor output, also known as ephemeral anchor, is attached to the settlement
-transaction. This MUST be spent in a relay package to be considered for block inclusion.
+A single shared anchor output is attached to the settlement transaction. When the settlement
+transaction has zero fees (the typical case), this output MUST be spent by a child transaction
+in the same relay package to satisfy TRUC rules and be considered for block inclusion.
 
-This output contains the scriptpubkey of:
+This output uses the P2A (Pay-To-Anchor) output type:
 
-`OP_TRUE`, the output value is the value of all the trimmed output values, summed.
+* scriptPubKey: `OP_1 <0x4e73>` (hex: `51024e73`)
+* Witness program: `0x4e73` (2 bytes, witness version 1)
+* Address: `bc1pfeessrawgf` (bech32m)
+* Output value: the sum of all trimmed output values, minimum 0 satoshis
 
-This allows an "empty" spend of the output by anyone, and no known mempool malleabilty vectors.
+The P2A output is spent with an empty witness stack (no witness data required), making it
+a "keyless" anyone-can-spend output. This allows:
 
-There is no consensus-level fix for malleability with bare scripts that lack a sighash,
-so that is the best we are going to do without committing to an expensive script hash.
+1. Either channel participant to provide CPFP fees
+2. Third parties (e.g., watchtowers) to bump fees without requiring key material
+3. Minimal on-chain footprint (~13 vB to create, ~41 vB to spend)
+
+The 2-byte witness program `0x4e73` provides no cryptographic security, making it unsuitable
+for any use case requiring authentication. As a witness v1 program, the spending input's
+scriptSig MUST be empty per BIP141. Witness stuffing is prevented by policy rules that
+reject non-empty witness stacks for P2A inputs.
 
 ### Trimmed Outputs
 
 Outputs with value below `dust_limit_satoshis` should not be produced;
 these outputs that are not produced are termed "trimmed". A trimmed output is
 considered too small to be worth creating and is instead added
-to the anchor output's value to be used as CPFP fees.
+to the P2A anchor output's value to be used as CPFP fees.
 
 #### Requirements
 
@@ -323,11 +343,18 @@ than twice `dust_limit_satoshis`.
 
 ## Fees
 
-The settlement transaction contains no fees, so implementers must rely
-on CPFP of the single anchor output for propogation and timely inclusion into the blockchain.
+Both update and settlement transactions are constructed with zero fees, relying on
+CPFP (Child-Pays-For-Parent) via the P2A anchor output for propagation and timely block inclusion.
 
-Transaction replacement of the CPFP can be a way to increase the feerate of the overall
-package, even if a counterparty is making CPFP transactions.
+Under TRUC rules (BIP431):
+- The parent transaction (update or settlement) can have zero fees
+- A child transaction spending the P2A output provides fees for the entire package
+- The child transaction is limited to 1,000 vB
+- Package RBF allows fee-bumping by replacing the child transaction
+
+Transaction replacement of the CPFP child is the primary mechanism to increase the effective
+feerate of the package. Since P2A outputs are keyless, either party (or a third-party watchtower)
+can create or replace the fee-bumping child transaction.
 
 ## Dust Limits
 
@@ -355,7 +382,7 @@ This transaction is relatively trivial to set up.
    [HTLC output](#htlc-outputs).
 1. For every `to_node` output, if it is not trimmed,
    add a [`to_node` output](#to_local-output).
-1. Add a single ephemeral output anchor.
+1. Add a single P2A anchor output.
 1. Sort the outputs into [BIP 69+CLTV order](#transaction-output-ordering).
 
 # References

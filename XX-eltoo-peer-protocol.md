@@ -614,7 +614,7 @@ A receiving node:
 ### Updating Fees: `update_fee`
 
 No fees are attached to update or settlement transactions and instead rely
-on ephemeral anchors for bringing fees, so this message is invalid.
+on P2A (Pay-To-Anchor) outputs for bringing fees via CPFP, so this message is invalid.
 
 ### Requirements
 

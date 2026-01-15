@@ -87,7 +87,7 @@ The local and remote nodes each hold a *update transaction*.
 
 These transactions contain a single input and output signed with
 SIGHASH_ALL|SIGHASH_ANYPREVOUTANYSCRIPT, which allows CPFP through
-the ephemeral anchor.
+the P2A (Pay-To-Anchor) output.
 
 Each update transaction should be "bound" to spend
 any prior funding or update output that is unresolved on the blockchain.
@@ -140,8 +140,8 @@ other HTLC outputs:
       - otherwise:
         - MUST broadcast the *complete update transaction*, for which it has a
         signature, to perform a *unilateral close*.
-          - MUST spend an ephemeral anchor in order to induce inclusion in a block in a timely manner to enforce final state via CPFP
-          - SHOULD use [replace-by-fee](https://github.com/bitcoin/bips/blob/master/bip-0125.mediawiki) or other mechanism on the anchor spending transaction if it proves insufficient for timely inclusion in a block.
+          - MUST spend the P2A anchor output in order to induce inclusion in a block in a timely manner to enforce final state via CPFP
+          - SHOULD use [replace-by-fee](https://github.com/bitcoin/bips/blob/master/bip-0125.mediawiki) or package RBF on the anchor-spending child transaction if it proves insufficient for timely inclusion in a block.
           - SHOULD then handle the rest of the flow as described in the rest of this document/
 
 ## Rationale
@@ -196,7 +196,7 @@ A node:
         to the invalidated update transactions' state output, recovering the necessary
         control block information from the invalidated update transaction's annex field.
       - If the latest update transaction is failing to be mined within the proper window,
-        package RBF replacement with a higher fee ephemeral anchor spend is recommended
+        package RBF replacement with a higher fee P2A anchor spend is recommended
         to avoid old state being successfully used and to avoid fulfilled HTLCs with incoming
         value being timed out.
     - MUST handle the publishing of the committed/complete update transaction as detailed in this document
