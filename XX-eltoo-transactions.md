@@ -34,7 +34,6 @@ consensus changes.
 The consensus assumptions are:
 
 1. These transactions assume [BIP118](https://github.com/bitcoin/bips/blob/master/bip-0118.mediawiki) (SIGHASH_ANYPREVOUT) in its current written form.
-1. Annex data is allowed, up to at least 33 bytes worth for our purposes.
 
 The policy assumptions are:
 
@@ -124,15 +123,16 @@ with the policy of `pk(1)`
    * `txin[0]` sequence: 0xFFFFFFFD
    * `txin[0]` script bytes: 0
    * `txin[0]` witness:
-     * annex: 0x50 followed by ''hash<sub>TapLeaf</sub>(0xC0 || compact_size(size of EXPR_SETTLE(m)) || EXPR_SETTLE(m))''
      * control block: 0xC0 marker for tapscript, internel public key, merkle proof unless spending funding tx
      * tapscript: EXPR_UPDATE(m+1)
      * `signature_for_inner_pubkey`
-* txout count: 2
+* txout count: 3
    * `txout[0]` amount: 0
    * `txout[0]` script: P2A (`OP_1 <0x4e73>`, witness v1 program, `bc1pfeessrawgf`)
-   * `txout[1]` amount: the channel capacity
-   * `txout[1]` script: `tr(aggregated_key, {EXPR_UPDATE(n+1), EXPR_SETTLE(n)})`
+   * `txout[1]` amount: 0
+   * `txout[1]` script: `OP_RETURN <hash_TapLeaf(0xC0 || compact_size(size of EXPR_SETTLE(m)) || EXPR_SETTLE(m))>`
+   * `txout[2]` amount: the channel capacity
+   * `txout[2]` script: `tr(aggregated_key, {EXPR_UPDATE(n+1), EXPR_SETTLE(n)})`
 
 and where EXPR_SETTLE(n) =
 
@@ -144,8 +144,6 @@ locktime of `x`, and `1_G` the 33-byte BIP118 public key matching the secp256k1 
 and where `signature_for_inner_pubkey uses SIGHASH_ALL|ANYPREVOUTANYSCRIPT.
 
 Note that the locktime must increase monotonically as it's used as the consensus ratchet for allowing rebinding of updates.
-
-FIXME Use some standardized annex formatting to avoid app/consensus collisions, aka Sunny Side of Annex
 
 ### Rationale
 
@@ -162,19 +160,19 @@ does not need rotation since the signature is committed to directly in the scrip
 and the signature directly commits to the settlement transaction, including the nlocktime
 which is unique per update in a given channel.
 
-The `annex` is required to allow recovery of the control block to spend an invalidated update
-transaction with the latest update transaction, without requiring particpants to hold all invalidated
+The `OP_RETURN` output is required to allow recovery of the control block to spend an invalidated update
+transaction with the latest update transaction, without requiring participants to hold all invalidated
 settlement states forever. This is due to the signature that is included in the script, which cannot
 be otherwise deterministically regenerated without access to the full settlement state.
- Alternatively, we could add another round-trip to HTLC additions and forwards,
+Alternatively, we could add another round-trip to HTLC additions and forwards,
 as well as further complicate the protocol.
 
 The "state-masking offset" is used to hide the total number of updates in the channel from
 blockchain observers. Future versions of this spec can introduce a randomized negotiation
 of this value.
 
-The P2A anchor will always be of value 0 (and the state output non-0), so output sorting will result in
-the P2A anchor output being first.
+The P2A anchor and OP_RETURN outputs will always be of value 0 (and the state output non-0), so output sorting will result in
+the P2A anchor output being first, followed by the OP_RETURN output, and finally the state output.
 
 ## Settlement Transaction
 

@@ -194,7 +194,7 @@ A node:
         to claim the latest channel state.
       - Otherwise, MUST respond by publishing the complete update transaction, re-binding
         to the invalidated update transactions' state output, recovering the necessary
-        control block information from the invalidated update transaction's annex field.
+        control block information from the invalidated update transaction's OP_RETURN output.
       - If the latest update transaction is failing to be mined within the proper window,
         package RBF replacement with a higher fee P2A anchor spend is recommended
         to avoid old state being successfully used and to avoid fulfilled HTLCs with incoming
