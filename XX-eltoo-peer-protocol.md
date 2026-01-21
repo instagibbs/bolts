@@ -584,8 +584,14 @@ A receiving node:
 #### Rationale
 
 HTLCs outputs do not require signatures by the offerer, which is why only a single signature
-for update transactions is required at this stage. Settlement transactions use a
-covenant commitment, therefore they do not require another signature as well.
+for update transactions is required at this stage. The partial signatures exchanged are
+MuSig2 partial signatures for the template hash (computed by OP_TEMPLATEHASH), which
+excludes prevout data and enables rebinding.
+
+Settlement transactions use a pure hash commitment (`OP_TEMPLATEHASH <expected_hash> OP_EQUAL`),
+therefore they do not require any signature at all. The expected template hash is embedded
+directly in the EXPR_SETTLE script at state creation time, and validation occurs at spend
+time by comparing the computed template hash against the embedded expected value.
 
 ### Finalizing the update: `update_signed_ack`
 

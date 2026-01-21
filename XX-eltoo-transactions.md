@@ -33,24 +33,35 @@ consensus changes.
 
 The consensus assumptions are:
 
-1. These transactions assume [BIP118](https://github.com/bitcoin/bips/blob/master/bip-0118.mediawiki) (SIGHASH_ANYPREVOUT) in its current written form.
+1. **OP_TEMPLATEHASH** (opcode 0xce): Pushes a 32-byte template hash onto the stack. The template hash commits to:
+   - `nVersion` (4 bytes)
+   - `nLockTime` (4 bytes)
+   - `sha_sequences` (32 bytes - SHA256 of all input sequences)
+   - `sha_outputs` (32 bytes - SHA256 of all outputs)
+   - `annex_present` (1 byte)
+   - `input_index` (4 bytes)
+   - `sha_annex` (32 bytes, if annex present)
 
-The policy assumptions are:
+   Notably **excluded** (enabling rebinding):
+   - `sha_prevouts` (prevout txids and indices)
+   - `sha_scriptpubkeys` (input scriptPubKeys)
+   - `sha_amounts` (input amounts)
 
-1. [TRUC Transactions (BIP431)](https://github.com/bitcoin/bips/blob/master/bip-0431.mediawiki): All update, settlement, and closing transactions use `nVersion=3` to signal TRUC (Topologically Restricted Until Confirmation). TRUC transactions enforce:
-   - A cluster limit of 2 (1 unconfirmed parent, 1 unconfirmed child)
-   - Maximum transaction size of 10,000 vB
-   - Maximum child transaction size of 1,000 vB
-   - Implicit replaceability signaling (no BIP125 flag required)
-   - Zero-fee parent transactions are permitted when packaged with a fee-paying child
-1. [Package Relay](https://github.com/bitcoin/bitcoin/blob/master/doc/policy/packages.md): 1-parent-1-child (1p1c) package relay is implemented and deployed, allowing zero-fee TRUC parent transactions to propagate with a fee-paying child.
-1. [Package RBF](https://github.com/bitcoin/bitcoin/pull/25038): Package-level replace-by-fee is adopted for transaction pinning mitigation.
-1. [Pay-To-Anchor (P2A)](https://github.com/bitcoin/bitcoin/pull/30352): Ephemeral anchor outputs use the P2A output type (`OP_1 <0x4e73>`), which is a keyless, anyone-can-spend witness v1 output. P2A outputs:
-   - Require no witness data to spend (empty witness stack)
-   - Have a dust threshold of 240 satoshis
-   - Are standard as of Bitcoin Core 28.0
-1. [Ephemeral Dust](https://github.com/bitcoin/bitcoin/pull/30239): Zero-value P2A outputs are permitted in TRUC transactions, provided the output is spent by a child transaction in the same package. This allows trimmed output value to flow to miner fees via CPFP.
-1. Mitigation for ACP-style pinning on APO (preventing 0-value junk inputs from being added to APO transactions).
+2. **OP_CHECKSIGFROMSTACK** ([BIP348](https://github.com/bitcoin/bips/blob/master/bip-0348.mediawiki)): Verifies a BIP340 Schnorr signature against a message taken from the stack rather than transaction data. Stack order: `<sig> <msg> <pubkey> OP_CHECKSIGFROMSTACK`.
+
+3. **OP_INTERNALKEY** ([BIP349](https://github.com/bitcoin/bips/blob/master/bip-0349.mediawiki)): Pushes the taproot internal key (x-only, 32 bytes) onto the stack. This is the key used in the taproot output being spent.
+
+### Script Comparison Summary
+
+| Script | BIP118 | OP_TEMPLATEHASH |
+|--------|--------|-----------------|
+| EXPR_UPDATE(0) | `<1> OP_CHECKSIG` | `OP_TEMPLATEHASH OP_INTERNALKEY OP_CHECKSIGFROMSTACK` |
+| EXPR_UPDATE(n>0) | `<1> OP_CHECKSIGVERIFY <TL(n)> OP_CLTV` | `OP_TEMPLATEHASH OP_INTERNALKEY OP_CSFSV <TL(n)> OP_CLTV` |
+| EXPR_SETTLE(n) | `<CovSig> <1_G> OP_CHECKSIG` | `OP_TEMPLATEHASH <expected_hash> OP_EQUAL` |
+
+Note:
+- EXPR_UPDATE: Signature comes from witness stack, verified against template hash using the internal key
+- EXPR_SETTLE: No signature needed - just hash equality check against precomputed expected hash
 
 # Transactions
 
@@ -102,13 +113,18 @@ TL(n) = `500000000+o+n`
 
 * where EXPR_UPDATE(x) =
 
-`<1> OP_CHECKSIGVERIFY <TL(x)> OP_CHECKLOCKTIMEVERIFY` if `x > 0`
-with the policy of `and(pk(1),after(TL(x)))`
+`OP_TEMPLATEHASH OP_INTERNALKEY OP_CHECKSIGFROMSTACKVERIFY <TL(x)> OP_CHECKLOCKTIMEVERIFY` if `x > 0`
 
 else
 
-`<1> OP_CHECKSIG`, in the case of `x == 0`
-with the policy of `pk(1)`
+`OP_TEMPLATEHASH OP_INTERNALKEY OP_CHECKSIGFROMSTACK`, in the case of `x == 0`
+
+The witness stack for spending EXPR_UPDATE is:
+```
+<BIP340_signature_over_template_hash>
+```
+
+The signature is verified against the template hash (computed by OP_TEMPLATEHASH) using the taproot internal key (pushed by OP_INTERNALKEY). Since the template hash excludes prevout data (`sha_prevouts`, `sha_scriptpubkeys`, `sha_amounts`), the same signature can be used to spend any prior state output (rebinding).
 
 * Output descriptors as defined by [BIP386](https://github.com/bitcoin/bips/blob/master/bip-0386.mediawiki#tr) and abused by the author.
 
@@ -123,9 +139,9 @@ with the policy of `pk(1)`
    * `txin[0]` sequence: 0xFFFFFFFD
    * `txin[0]` script bytes: 0
    * `txin[0]` witness:
-     * control block: 0xC0 marker for tapscript, internel public key, merkle proof unless spending funding tx
+     * `signature_for_template_hash`: BIP340 signature over the template hash, verified via OP_CHECKSIGFROMSTACK against the internal key
      * tapscript: EXPR_UPDATE(m+1)
-     * `signature_for_inner_pubkey`
+     * control block: 0xC0 marker for tapscript, internal public key, merkle proof unless spending funding tx
 * txout count: 3
    * `txout[0]` amount: 0
    * `txout[0]` script: P2A (`OP_1 <0x4e73>`, witness v1 program, `bc1pfeessrawgf`)
@@ -136,36 +152,49 @@ with the policy of `pk(1)`
 
 and where EXPR_SETTLE(n) =
 
-`<CovSig(TL(n))> <1_G> OP_CHECKSIG`
+`OP_TEMPLATEHASH <expected_template_hash(n)> OP_EQUAL`
 
-where `CovSig(x)` is the SIGHASH_ALL|ANYPREVOUTANYSCRIPT signature of the corresponding settlement transaction with a
-locktime of `x`, and `1_G` the 33-byte BIP118 public key matching the secp256k1 generator `G`, using the [BIP340](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki#Default_Signing) "Default Signing" nonce derivation function, with no auxiliary input.
+where `expected_template_hash(n)` is the precomputed 32-byte template hash of the corresponding settlement transaction with locktime TL(n). The template hash is deterministic from the transaction structure:
+- `nVersion` (3, for TRUC)
+- `nLockTime` (TL(n))
+- `sha_sequences` (from `shared_delay` relative timelock)
+- `sha_outputs` (settlement outputs)
+- `input_index` (0)
 
-and where `signature_for_inner_pubkey uses SIGHASH_ALL|ANYPREVOUTANYSCRIPT.
+No signature is required for the settlement path. At spend time:
+1. `OP_TEMPLATEHASH` computes the actual template hash from the spending transaction
+2. `OP_EQUAL` verifies it matches the embedded `expected_template_hash(n)`
+3. Successful match leaves `1` (TRUE) on the stack
+
+The witness stack for spending EXPR_SETTLE is empty (no additional witness data beyond the control block and tapscript).
+
+and where `signature_for_inner_pubkey` is a standard BIP340 signature over the template hash computed by OP_TEMPLATEHASH.
 
 Note that the locktime must increase monotonically as it's used as the consensus ratchet for allowing rebinding of updates.
 
 ### Rationale
 
-Anyprevout style covenants are used in the update transaction taptree to avoid requiring
-additional communication round-trips for forwarding HTLC messages. If we required a
-standard MuSig2 signature for the settlement transaction, it would be unsafe to hand
-your counterparty both update and settlement signatures in one step, as the counterparty
-could ransom your funds by publishing a completed update transaction, and withhold the
-final settlement signature.
+OP_TEMPLATEHASH-based covenants are used in the update transaction taptree to avoid requiring
+additional communication round-trips for forwarding HTLC messages. The template hash excludes
+prevout data, enabling the same signature to be used for rebinding to any prior state output.
 
-We use the public generator G as a "well known" point, where privkey is `1`,
-so the signature can be recreated by any software, including watchtowers. The script
-does not need rotation since the signature is committed to directly in the script,
-and the signature directly commits to the settlement transaction, including the nlocktime
-which is unique per update in a given channel.
+The EXPR_SETTLE script uses a pure hash commitment (`OP_TEMPLATEHASH <expected_hash> OP_EQUAL`)
+rather than a signature. This is possible because:
+1. The template hash is deterministic from the settlement transaction structure
+2. We embed the expected hash directly in the script at state creation time
+3. At spend time, OP_TEMPLATEHASH computes the actual hash and OP_EQUAL validates the match
+4. No signature is needed - just the correct settlement transaction
 
-The `OP_RETURN` output is required to allow recovery of the control block to spend an invalidated update
-transaction with the latest update transaction, without requiring participants to hold all invalidated
-settlement states forever. This is due to the signature that is included in the script, which cannot
-be otherwise deterministically regenerated without access to the full settlement state.
-Alternatively, we could add another round-trip to HTLC additions and forwards,
-as well as further complicate the protocol.
+This simplification is a key advantage over BIP118: watchtowers can enforce settlement
+by simply spending with the correct settlement transaction, without needing to recreate
+any signatures. The settlement transaction structure (outputs, locktime) is recoverable
+from on-chain data.
+
+The `OP_RETURN` output is required to allow recovery of the settlement tapleaf hash to spend
+an invalidated update transaction with the latest update transaction, without requiring
+participants to hold all invalidated settlement states forever. The tapleaf hash encodes
+the expected template hash, which combined with the settlement transaction structure
+allows reconstruction of the complete taproot spend path.
 
 The "state-masking offset" is used to hide the total number of updates in the channel from
 blockchain observers. Future versions of this spec can introduce a randomized negotiation
@@ -187,7 +216,7 @@ the P2A anchor output being first, followed by the OP_RETURN output, and finally
      * tapscript: EXPR_SETTLE(n)
      * (no additional witness data needed)
 
-Note there may be additional attached transaction inputs due to the ANYPREVOUTANYSCRIPT signatures which can be used to attach fees during settlement.
+Note: The template hash used by EXPR_SETTLE commits to `sha_outputs` and `sha_sequences` but excludes prevout data. This means the settlement transaction structure (outputs, sequences) is fixed, but additional inputs could theoretically be attached. However, the standard settlement flow uses CPFP via the P2A anchor output rather than additional inputs.
 
 ### Settlement Transaction Outputs
 

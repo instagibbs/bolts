@@ -83,11 +83,14 @@ trigger any action.
 
 # Update Transaction
 
-The local and remote nodes each hold a *update transaction*. 
+The local and remote nodes each hold an *update transaction*.
 
-These transactions contain a single input and output signed with
-SIGHASH_ALL|SIGHASH_ANYPREVOUTANYSCRIPT, which allows CPFP through
-the P2A (Pay-To-Anchor) output.
+These transactions contain a single input and three outputs (P2A anchor,
+OP_RETURN with settlement tapleaf hash, state output). The signature
+is verified via OP_CHECKSIGFROMSTACK against the template hash
+computed by OP_TEMPLATEHASH. The template hash excludes prevout
+data (`sha_prevouts`, `sha_scriptpubkeys`, `sha_amounts`), enabling rebinding
+to any prior state output.
 
 Each update transaction should be "bound" to spend
 any prior funding or update output that is unresolved on the blockchain.
@@ -178,10 +181,21 @@ is what allows honest peers to ensure the final state is claimed.
 
 ## Requirements
 
-"Rebinding" is the act of taking a pre-signed ANYPREVOUT(ANYSCRIPT) transaction,
-and finalizing all the witness data, as well as modifying the prevout itself,
-to spend the current unresolved state utxo. In the case of Eltoo,
-this is the funding output, or any subsequent update transaction state output.
+"Rebinding" is the act of taking a pre-signed TEMPLATEHASH-verified transaction
+and modifying the prevout to spend the current unresolved state UTXO. Since the
+template hash excludes prevout data (`sha_prevouts`, `sha_scriptpubkeys`, `sha_amounts`),
+the same signature remains valid when spending any prior state output. In the case
+of Eltoo, this is the funding output, or any subsequent update transaction state output.
+
+For update transactions: The signature (verified via OP_CHECKSIGFROMSTACK against
+the template hash) can be reused when changing which state output is spent.
+
+For settlement transactions: No signature is needed. The EXPR_SETTLE script
+uses `OP_TEMPLATEHASH <expected_hash> OP_EQUAL`, which validates that the
+settlement transaction structure matches the expected template hash embedded
+in the script. Rebinding simply means updating the prevout to point to the
+current state output; the settlement transaction itself doesn't change.
+
 Both update and settlement transactions should be re-bound at broadcast time
 to react to on-chain events properly.
 
